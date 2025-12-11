@@ -1,0 +1,246 @@
+import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { RefreshCw, AlertCircle, Trash2, FileText, Search, Download } from "lucide-react";
+import type { Fm26Installation, LogInfo } from "@/types";
+
+const STORAGE_KEY = "fm26_install_path";
+
+export function LogsTab() {
+  const [installation, setInstallation] = useState<Fm26Installation | null>(null);
+  const [logContent, setLogContent] = useState<string>("");
+  const [logInfo, setLogInfo] = useState<LogInfo | null>(null);
+  const [filter, setFilter] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load installation on mount
+  useEffect(() => {
+    const savedPath = localStorage.getItem(STORAGE_KEY);
+    if (savedPath) {
+      loadInstallation(savedPath);
+    }
+  }, []);
+
+  const loadInstallation = async (path: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const install = await invoke<Fm26Installation>("inspect_fm26_install", {
+        rootPath: path,
+      });
+      setInstallation(install);
+      await loadData(install);
+    } catch (err) {
+      setError(String(err));
+      setInstallation(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadData = async (install: Fm26Installation) => {
+    try {
+      const [content, info] = await Promise.all([
+        invoke<string>("read_log", { install }),
+        invoke<LogInfo>("get_log_info", { install }),
+      ]);
+      setLogContent(content);
+      setLogInfo(info);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (installation) {
+      setIsLoading(true);
+      await loadData(installation);
+      setIsLoading(false);
+    }
+  };
+
+  const handleClear = async () => {
+    if (!installation) return;
+
+    try {
+      await invoke("clear_log", { install: installation });
+      setLogContent("");
+      await loadData(installation);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleExport = () => {
+    if (!logContent) return;
+
+    const blob = new Blob([logContent], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `BepInEx_Log_${new Date().toISOString().split("T")[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const getFilteredLines = (): string[] => {
+    const lines = logContent.split("\n");
+    if (!filter.trim()) return lines;
+
+    const filterLower = filter.toLowerCase();
+    return lines.filter((line) => line.toLowerCase().includes(filterLower));
+  };
+
+  const filteredLines = getFilteredLines();
+  const logLevelColors: Record<string, string> = {
+    "[Error]": "text-red-500",
+    "[Warning]": "text-yellow-500",
+    "[Info]": "text-blue-400",
+    "[Debug]": "text-gray-400",
+    "[Message]": "text-green-400",
+  };
+
+  const getLineClass = (line: string): string => {
+    for (const [level, className] of Object.entries(logLevelColors)) {
+      if (line.includes(level)) return className;
+    }
+    return "";
+  };
+
+  if (!installation) {
+    return (
+      <div className="space-y-4 pt-4">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Installation Selected</AlertTitle>
+          <AlertDescription>
+            Please select your FM26 installation directory in the Game tab first.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pt-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              <span>BepInEx Log</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleExport}
+                variant="outline"
+                size="sm"
+                disabled={!logContent}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={handleClear}
+                variant="outline"
+                size="sm"
+                disabled={!logContent}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          </CardTitle>
+          <CardDescription className="flex items-center gap-4">
+            {logInfo && (
+              <>
+                <Badge variant={logInfo.exists ? "outline" : "secondary"}>
+                  {logInfo.exists ? formatBytes(logInfo.size_bytes) : "No log file"}
+                </Badge>
+                {logInfo.modified && (
+                  <span className="text-xs text-muted-foreground">
+                    Modified: {logInfo.modified}
+                  </span>
+                )}
+              </>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Filter logs..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="flex-1"
+            />
+            {filter && (
+              <Badge variant="secondary">
+                {filteredLines.length} / {logContent.split("\n").length} lines
+              </Badge>
+            )}
+          </div>
+
+          <div className="border rounded-md bg-black/50">
+            <ScrollArea className="h-[400px]" ref={scrollRef}>
+              <pre className="p-4 text-xs font-mono whitespace-pre-wrap break-all">
+                {logContent ? (
+                  filteredLines.map((line, index) => (
+                    <div key={index} className={getLineClass(line)}>
+                      {line}
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-muted-foreground">
+                    No log content. Run the game with BepInEx to generate logs.
+                  </span>
+                )}
+              </pre>
+            </ScrollArea>
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            <p>Log file location:</p>
+            <p className="font-mono break-all">{installation.log_path}</p>
+          </div>
+
+          <div className="flex gap-2 text-xs">
+            <Badge variant="outline" className="text-red-500">Error</Badge>
+            <Badge variant="outline" className="text-yellow-500">Warning</Badge>
+            <Badge variant="outline" className="text-blue-400">Info</Badge>
+            <Badge variant="outline" className="text-green-400">Message</Badge>
+            <Badge variant="outline" className="text-gray-400">Debug</Badge>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

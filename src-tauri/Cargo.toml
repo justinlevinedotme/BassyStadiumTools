@@ -1,0 +1,31 @@
+[package]
+name = "fm-stadium-tools"
+version = "0.1.0"
+description = "FM26 Stadium & Audio Mod Manager"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "fm_stadium_tools_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zip = "2"
+ini = "1"
+chrono = "0.4"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
