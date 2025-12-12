@@ -1,11 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useUpdater } from "@/hooks/useUpdater";
 import { toast } from "sonner";
 import { relaunch } from "@tauri-apps/plugin-process";
 
 export function UpdateChecker() {
   const { checkForUpdate, downloadAndInstall, downloading, progress } = useUpdater();
-  const hasChecked = useRef(false);
 
   useEffect(() => {
     console.log("[Updater] Component mounted");
