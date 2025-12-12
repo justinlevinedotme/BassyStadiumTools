@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FolderOpen, Download, RefreshCw, AlertCircle, CheckCircle2, FileArchive, Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Fm26Installation, PluginStatus } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -20,7 +22,6 @@ export function GameTab() {
   const [detectedPaths, setDetectedPaths] = useState<string[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isInstallingStadiums, setIsInstallingStadiums] = useState(false);
@@ -109,11 +110,10 @@ export function GameTab() {
 
     setIsInstalling(true);
     setError(null);
-    setSuccess(null);
 
     try {
       await invoke("install_bepinex_pack", { install: installation });
-      setSuccess("BepInEx Stadium Pack installed successfully!");
+      toast.success("BepInEx Stadium Pack installed!");
 
       // Refresh plugin status
       const pluginStatus = await invoke<PluginStatus[]>("get_plugin_status", {
@@ -121,7 +121,7 @@ export function GameTab() {
       });
       setPlugins(pluginStatus);
     } catch (err) {
-      setError(String(err));
+      toast.error("Failed to install BepInEx", { description: String(err) });
     } finally {
       setIsInstalling(false);
     }
@@ -146,17 +146,16 @@ export function GameTab() {
       if (selected && typeof selected === "string") {
         setIsInstallingStadiums(true);
         setError(null);
-        setSuccess(null);
 
         const filesExtracted = await invoke<number>("install_custom_stadiums_pack", {
           zipPath: selected,
           install: installation,
         });
 
-        setSuccess(`Custom stadiums installed successfully! (${filesExtracted} files extracted)`);
+        toast.success("Custom stadiums installed!", { description: `${filesExtracted} files extracted` });
       }
     } catch (err) {
-      setError(String(err));
+      toast.error("Failed to install stadiums", { description: String(err) });
     } finally {
       setIsInstallingStadiums(false);
     }
@@ -212,25 +211,34 @@ export function GameTab() {
               placeholder="C:\Program Files\Steam\steamapps\common\Football Manager 2026"
               className="flex-1"
             />
-            <Button
-              onClick={handleAutoDetect}
-              variant="outline"
-              disabled={isDetecting}
-              title="Auto-detect FM26 installation"
-            >
-              <Search className={`h-4 w-4 ${isDetecting ? "animate-pulse" : ""}`} />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleAutoDetect}
+                  variant="outline"
+                  disabled={isDetecting}
+                >
+                  <Search className={`h-4 w-4 ${isDetecting ? "animate-pulse" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Auto-detect FM26</TooltipContent>
+            </Tooltip>
             <Button onClick={handleBrowse} variant="outline">
               <FolderOpen className="mr-2 h-4 w-4" />
               Browse
             </Button>
-            <Button
-              onClick={handleRefresh}
-              variant="outline"
-              disabled={!installPath || isLoading}
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleRefresh}
+                  variant="outline"
+                  disabled={!installPath || isLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
           </div>
 
           {error && (
@@ -241,13 +249,6 @@ export function GameTab() {
             </Alert>
           )}
 
-          {success && (
-            <Alert variant="success">
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>Success</AlertTitle>
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
 
