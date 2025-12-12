@@ -226,13 +226,6 @@ jobs:
           prerelease: false
           args: --verbose
 
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v5
-        with:
-          name: tauri-bundles-windows-${{ inputs.test_build == true && 'test' || github.ref_name }}
-          path: ${{ inputs.test_build == true && steps.tauri_test.outputs.artifactPaths || steps.tauri_release.outputs.artifactPaths }}
-
   finalize-release:
     needs: [sync-version, build-windows]
     if: inputs.dry_run != true && inputs.test_build != true
@@ -240,11 +233,18 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v6
-        with:
-          name: tauri-bundles-windows-${{ github.ref_name }}
-          path: artifacts
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          mkdir -p artifacts
+
+          # Download all assets from the draft release
+          gh release download "$TAG" --repo "${{ github.repository }}" --dir artifacts || true
+
+          echo "Downloaded assets:"
+          ls -la artifacts/
 
       - name: Generate latest.json for Tauri updater
         env:
