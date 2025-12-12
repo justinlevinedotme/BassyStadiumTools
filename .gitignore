@@ -18,10 +18,9 @@ node_modules/
 .vscode/launch.json
 .vscode/tasks.json
 
-# npm, yarn and bun lock files
+# npm, yarn and bun lock files (keep pnpm-lock.yaml for CI)
 package-lock.json
 yarn.lock
-pnpm-lock.yaml
 bun.lockb
 
 # rust compiled folders
