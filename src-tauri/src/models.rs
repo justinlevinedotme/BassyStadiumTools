@@ -77,3 +77,76 @@ impl Default for StadiumInjectionConfig {
         }
     }
 }
+
+/// Configuration for the AudioInject plugin
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioInjectConfig {
+    // [General]
+    pub enable_audio_injection: bool,
+    pub master_volume: f32,
+    pub debug_mode: bool,
+    // [Audio]
+    pub music_volume: f32,
+    pub event_volume: f32,
+    pub loop_music: bool,
+}
+
+impl Default for AudioInjectConfig {
+    fn default() -> Self {
+        Self {
+            enable_audio_injection: true,
+            master_volume: 0.7,
+            debug_mode: false,
+            music_volume: 1.0,
+            event_volume: 1.0,
+            loop_music: true,
+        }
+    }
+}
+
+/// Configuration for the CrowdInject plugin
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrowdInjectConfig {
+    // [General]
+    pub enable_crowd_injection: bool,
+    pub crowd_density: i32,
+    pub always_full_capacity: bool,
+    pub debug_mode: bool,
+    // [Performance]
+    pub crowd_skip_rate: i32,
+    // [Rendering]
+    pub use_billboards: bool,
+    pub use_fm_crowd_render: bool,
+    pub use_gpu_instancing: bool,
+    pub use_team_colors: bool,
+}
+
+impl Default for CrowdInjectConfig {
+    fn default() -> Self {
+        Self {
+            enable_crowd_injection: true,
+            crowd_density: 100,
+            always_full_capacity: false,
+            debug_mode: false,
+            crowd_skip_rate: 4,
+            use_billboards: false,
+            use_fm_crowd_render: false,
+            use_gpu_instancing: false,
+            use_team_colors: true,
+        }
+    }
+}
+
+/// Configuration for Adboards (part of StadiumInjection)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdboardsConfig {
+    pub disable_adboards: bool,
+}
+
+impl Default for AdboardsConfig {
+    fn default() -> Self {
+        Self {
+            disable_adboards: false,
+        }
+    }
+}

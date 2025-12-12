@@ -1,8 +1,8 @@
 [package]
-name = "fm-stadium-tools"
+name = "bassy-stadium-tools"
 version = "0.1.0"
 description = "FM26 Stadium & Audio Mod Manager"
-authors = ["you"]
+authors = ["Justin Levine <hello@justinlevine.me>"]
 edition = "2021"
 
 [lib]
@@ -22,6 +22,7 @@ serde_json = "1"
 zip = "2"
 ini = "1"
 chrono = "0.4"
+dirs = "5"
 
 [profile.release]
 panic = "abort"

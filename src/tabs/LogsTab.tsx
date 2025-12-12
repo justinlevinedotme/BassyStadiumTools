@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCw, AlertCircle, Trash2, FileText, Search, Download } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCw, AlertCircle, Trash2, FileText, Search, Download, Play, Pause } from "lucide-react";
 import type { Fm26Installation, LogInfo } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -18,7 +21,10 @@ export function LogsTab() {
   const [filter, setFilter] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState<number>(3000);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load installation on mount
   useEffect(() => {
@@ -26,6 +32,36 @@ export function LogsTab() {
     if (savedPath) {
       loadInstallation(savedPath);
     }
+  }, []);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (autoRefresh && installation) {
+      intervalRef.current = setInterval(() => {
+        loadData(installation, true);
+      }, refreshInterval);
+
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      };
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+  }, [autoRefresh, refreshInterval, installation]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, []);
 
   const loadInstallation = async (path: string) => {
@@ -37,7 +73,7 @@ export function LogsTab() {
         rootPath: path,
       });
       setInstallation(install);
-      await loadData(install);
+      await loadData(install, false);
     } catch (err) {
       setError(String(err));
       setInstallation(null);
@@ -46,7 +82,7 @@ export function LogsTab() {
     }
   };
 
-  const loadData = async (install: Fm26Installation) => {
+  const loadData = async (install: Fm26Installation, silent: boolean = false) => {
     try {
       const [content, info] = await Promise.all([
         invoke<string>("read_log", { install }),
@@ -54,15 +90,20 @@ export function LogsTab() {
       ]);
       setLogContent(content);
       setLogInfo(info);
+      if (!silent) {
+        setError(null);
+      }
     } catch (err) {
-      setError(String(err));
+      if (!silent) {
+        setError(String(err));
+      }
     }
   };
 
   const handleRefresh = async () => {
     if (installation) {
       setIsLoading(true);
-      await loadData(installation);
+      await loadData(installation, false);
       setIsLoading(false);
     }
   };
@@ -194,6 +235,49 @@ export function LogsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Auto-refresh controls */}
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {autoRefresh ? (
+                  <Play className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Pause className="h-4 w-4 text-muted-foreground" />
+                )}
+                <Label htmlFor="autoRefresh" className="text-sm">
+                  Auto-refresh
+                </Label>
+              </div>
+              <Switch
+                id="autoRefresh"
+                checked={autoRefresh}
+                onCheckedChange={setAutoRefresh}
+              />
+            </div>
+            {autoRefresh && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="interval" className="text-sm text-muted-foreground">
+                  Interval:
+                </Label>
+                <Select
+                  value={String(refreshInterval)}
+                  onValueChange={(value) => setRefreshInterval(Number(value))}
+                >
+                  <SelectTrigger id="interval" className="w-24 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1000">1s</SelectItem>
+                    <SelectItem value="2000">2s</SelectItem>
+                    <SelectItem value="3000">3s</SelectItem>
+                    <SelectItem value="5000">5s</SelectItem>
+                    <SelectItem value="10000">10s</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input

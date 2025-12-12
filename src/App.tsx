@@ -9,10 +9,12 @@ function App() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-6xl">
-        <h1 className="mb-6 text-3xl font-bold text-foreground">
-          FM Stadium Tools
+        <h1 className="text-3xl font-bold text-foreground">
+          BassyStadiumTools
         </h1>
-
+        <h4 className="mb-6 text-1xl text-muted-foreground">
+          by Justin Levine (jalco) for BassyBoy
+        </h4>
         <Tabs defaultValue="game" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="game">Game</TabsTrigger>

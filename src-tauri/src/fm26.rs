@@ -1,10 +1,153 @@
 use crate::models::{Fm26Installation, PluginStatus};
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use chrono::Local;
 use tauri::Manager;
 use zip::ZipArchive;
+
+/// Detects possible FM26 installation paths on the system
+#[tauri::command]
+pub fn detect_fm26_paths() -> Vec<String> {
+    let mut paths: Vec<String> = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        // Common Steam paths
+        let steam_paths = vec![
+            r"C:\Program Files (x86)\Steam\steamapps\common\Football Manager 2026",
+            r"C:\Program Files\Steam\steamapps\common\Football Manager 2026",
+            r"D:\Steam\steamapps\common\Football Manager 2026",
+            r"D:\SteamLibrary\steamapps\common\Football Manager 2026",
+            r"E:\Steam\steamapps\common\Football Manager 2026",
+            r"E:\SteamLibrary\steamapps\common\Football Manager 2026",
+            r"F:\Steam\steamapps\common\Football Manager 2026",
+            r"F:\SteamLibrary\steamapps\common\Football Manager 2026",
+        ];
+
+        // Common Epic Games paths
+        let epic_paths = vec![
+            r"C:\Program Files\Epic Games\FootballManager2026",
+            r"C:\Program Files (x86)\Epic Games\FootballManager2026",
+            r"D:\Epic Games\FootballManager2026",
+            r"E:\Epic Games\FootballManager2026",
+        ];
+
+        // Check Steam paths
+        for path_str in steam_paths {
+            let path = Path::new(path_str);
+            if path.exists() && is_valid_fm26_dir(path) {
+                paths.push(path_str.to_string());
+            }
+        }
+
+        // Check Epic paths
+        for path_str in epic_paths {
+            let path = Path::new(path_str);
+            if path.exists() && is_valid_fm26_dir(path) {
+                paths.push(path_str.to_string());
+            }
+        }
+
+        // Try to find Steam library folders from libraryfolders.vdf
+        if let Some(steam_libs) = find_steam_library_folders() {
+            for lib in steam_libs {
+                let fm_path = lib.join("steamapps").join("common").join("Football Manager 2026");
+                if fm_path.exists() && is_valid_fm26_dir(&fm_path) {
+                    let path_str = fm_path.to_string_lossy().to_string();
+                    if !paths.contains(&path_str) {
+                        paths.push(path_str);
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Steam on macOS
+        if let Some(home) = dirs::home_dir() {
+            let steam_path = home
+                .join("Library/Application Support/Steam/steamapps/common/Football Manager 2026");
+            if steam_path.exists() && is_valid_fm26_dir(&steam_path) {
+                paths.push(steam_path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Steam on Linux
+        if let Some(home) = dirs::home_dir() {
+            let steam_paths = vec![
+                home.join(".steam/steam/steamapps/common/Football Manager 2026"),
+                home.join(".local/share/Steam/steamapps/common/Football Manager 2026"),
+            ];
+            for steam_path in steam_paths {
+                if steam_path.exists() && is_valid_fm26_dir(&steam_path) {
+                    paths.push(steam_path.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+
+    paths
+}
+
+/// Checks if a directory looks like a valid FM26 installation
+fn is_valid_fm26_dir(path: &Path) -> bool {
+    // Look for common FM files/folders
+    let exe_path = path.join("fm.exe");
+    let exe_path_alt = path.join("Football Manager 2026.exe");
+    let data_path = path.join("data");
+
+    exe_path.exists() || exe_path_alt.exists() || data_path.exists()
+}
+
+/// Find Steam library folders from libraryfolders.vdf
+#[cfg(target_os = "windows")]
+fn find_steam_library_folders() -> Option<Vec<PathBuf>> {
+    let vdf_paths = vec![
+        PathBuf::from(r"C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf"),
+        PathBuf::from(r"C:\Program Files\Steam\steamapps\libraryfolders.vdf"),
+    ];
+
+    for vdf_path in vdf_paths {
+        if vdf_path.exists() {
+            if let Ok(content) = fs::read_to_string(&vdf_path) {
+                let mut folders = Vec::new();
+                // Simple parsing - look for "path" entries
+                for line in content.lines() {
+                    let line = line.trim();
+                    if line.starts_with("\"path\"") {
+                        // Extract path between quotes
+                        if let Some(start) = line.find("\"path\"") {
+                            let rest = &line[start + 6..];
+                            if let Some(path_start) = rest.find('"') {
+                                let rest = &rest[path_start + 1..];
+                                if let Some(path_end) = rest.find('"') {
+                                    let path_str = &rest[..path_end];
+                                    // Handle escaped backslashes
+                                    let path_str = path_str.replace("\\\\", "\\");
+                                    folders.push(PathBuf::from(path_str));
+                                }
+                            }
+                        }
+                    }
+                }
+                if !folders.is_empty() {
+                    return Some(folders);
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+fn find_steam_library_folders() -> Option<Vec<PathBuf>> {
+    None
+}
 
 /// Inspects an FM26 installation directory and returns structured paths
 #[tauri::command]

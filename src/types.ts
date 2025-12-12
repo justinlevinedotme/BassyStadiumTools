@@ -57,3 +57,33 @@ export interface LogInfo {
   modified: string | null;
   path: string;
 }
+
+export interface AudioInjectConfig {
+  // [General]
+  enable_audio_injection: boolean;
+  master_volume: number; // 0.0 to 1.0
+  debug_mode: boolean;
+  // [Audio]
+  music_volume: number; // 0.0 to 1.0
+  event_volume: number; // 0.0 to 1.0
+  loop_music: boolean;
+}
+
+export interface CrowdInjectConfig {
+  // [General]
+  enable_crowd_injection: boolean;
+  crowd_density: number; // 10 to 100
+  always_full_capacity: boolean;
+  debug_mode: boolean;
+  // [Performance]
+  crowd_skip_rate: number; // 1, 2, 4, or 8
+  // [Rendering]
+  use_billboards: boolean;
+  use_fm_crowd_render: boolean;
+  use_gpu_instancing: boolean;
+  use_team_colors: boolean;
+}
+
+export interface AdboardsConfig {
+  disable_adboards: boolean;
+}

@@ -1,6 +1,6 @@
 # FM Stadium Tools
 
-A Windows desktop application for managing BepInEx 6 stadium and audio mods for Football Manager 2026.
+A Windows desktop application for managing BassyBoy's stadium mods for Football Manager 26, created by justinlevinedotme/jalco
 
 ## Features
 
@@ -78,7 +78,3 @@ src-tauri/target/x86_64-pc-windows-gnu/release/bundle/
 │       └── bepinex_pack.zip  # Bundled mod pack
 └── package.json
 ```
-
-## License
-
-MIT

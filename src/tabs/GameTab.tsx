@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FolderOpen, Download, RefreshCw, AlertCircle, CheckCircle2, FileArchive } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FolderOpen, Download, RefreshCw, AlertCircle, CheckCircle2, FileArchive, Search } from "lucide-react";
 import type { Fm26Installation, PluginStatus } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -16,20 +17,46 @@ export function GameTab() {
   const [installPath, setInstallPath] = useState<string>("");
   const [installation, setInstallation] = useState<Fm26Installation | null>(null);
   const [plugins, setPlugins] = useState<PluginStatus[]>([]);
+  const [detectedPaths, setDetectedPaths] = useState<string[]>([]);
+  const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isInstallingStadiums, setIsInstallingStadiums] = useState(false);
 
-  // Load saved path on mount
+  // Load saved path on mount, or try auto-detect
   useEffect(() => {
     const savedPath = localStorage.getItem(STORAGE_KEY);
     if (savedPath) {
       setInstallPath(savedPath);
       validateAndLoadInstallation(savedPath);
+    } else {
+      // No saved path, try auto-detection
+      handleAutoDetect();
     }
   }, []);
+
+  const handleAutoDetect = async () => {
+    setIsDetecting(true);
+    setError(null);
+
+    try {
+      const paths = await invoke<string[]>("detect_fm26_paths");
+      setDetectedPaths(paths);
+
+      // If exactly one path found, auto-select it
+      if (paths.length === 1) {
+        setInstallPath(paths[0]);
+        await validateAndLoadInstallation(paths[0]);
+      }
+    } catch (err) {
+      // Silent fail for auto-detect - user can browse manually
+      console.error("Auto-detect failed:", err);
+    } finally {
+      setIsDetecting(false);
+    }
+  };
 
   const validateAndLoadInstallation = async (path: string) => {
     if (!path) return;
@@ -148,6 +175,36 @@ export function GameTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Auto-detected paths dropdown */}
+          {detectedPaths.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span>Found {detectedPaths.length} FM26 installation{detectedPaths.length > 1 ? "s" : ""}</span>
+              </div>
+              {detectedPaths.length > 1 && (
+                <Select
+                  value={installPath}
+                  onValueChange={(value) => {
+                    setInstallPath(value);
+                    validateAndLoadInstallation(value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select detected installation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {detectedPaths.map((path) => (
+                      <SelectItem key={path} value={path}>
+                        {path}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Input
               value={installPath}
@@ -155,6 +212,14 @@ export function GameTab() {
               placeholder="C:\Program Files\Steam\steamapps\common\Football Manager 2026"
               className="flex-1"
             />
+            <Button
+              onClick={handleAutoDetect}
+              variant="outline"
+              disabled={isDetecting}
+              title="Auto-detect FM26 installation"
+            >
+              <Search className={`h-4 w-4 ${isDetecting ? "animate-pulse" : ""}`} />
+            </Button>
             <Button onClick={handleBrowse} variant="outline">
               <FolderOpen className="mr-2 h-4 w-4" />
               Browse

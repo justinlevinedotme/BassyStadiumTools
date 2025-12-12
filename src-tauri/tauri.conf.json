@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "FM Stadium Tools",
+  "productName": "BassyStadiumTools",
   "version": "0.1.0",
-  "identifier": "com.fmstadiumtools.app",
+  "identifier": "com.BassyStadiumTools.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "FM Stadium Tools",
+        "title": " BassyStadiumTools",
         "width": 1200,
         "height": 800,
         "resizable": true,
