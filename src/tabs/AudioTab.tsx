@@ -7,7 +7,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, AlertCircle, CheckCircle2, Plus, Trash2, Save, Music } from "lucide-react";
+import { toast } from "sonner";
+import { RefreshCw, AlertCircle, Plus, Trash2, Save, Music } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ComingSoonOverlay } from "@/components/ComingSoonOverlay";
 import type { Fm26Installation, AudioMapping, AudioFolderStatus } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -20,7 +23,6 @@ export function AudioTab() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [folderStatus, setFolderStatus] = useState<AudioFolderStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -114,17 +116,16 @@ export function AudioTab() {
 
     setIsSaving(true);
     setError(null);
-    setSuccess(null);
 
     try {
       await invoke("write_audio_mappings", {
         install: installation,
         mappings,
       });
-      setSuccess("Audio mappings saved successfully!");
+      toast.success("Audio mappings saved!");
       setOriginalMappings(mappings);
     } catch (err) {
-      setError(String(err));
+      toast.error("Failed to save audio mappings", { description: String(err) });
     } finally {
       setIsSaving(false);
     }
@@ -132,7 +133,6 @@ export function AudioTab() {
 
   const handleRevert = () => {
     setMappings(originalMappings);
-    setSuccess(null);
     setError(null);
   };
 
@@ -162,21 +162,14 @@ export function AudioTab() {
         </Alert>
       )}
 
-      {success && (
-        <Alert variant="success">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Success</AlertTitle>
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Audio Mappings */}
-        <Card>
+      <ComingSoonOverlay>
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Audio Mappings */}
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Audio Mappings</span>
-              <Badge variant={hasChanges ? "secondary" : "outline"}>
+              <Badge variant={hasChanges ? "warning" : "success"}>
                 {hasChanges ? "Unsaved Changes" : "Saved"}
               </Badge>
             </CardTitle>
@@ -223,13 +216,18 @@ export function AudioTab() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveMapping(index)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveMapping(index)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Remove mapping</TooltipContent>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -268,9 +266,14 @@ export function AudioTab() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Folder Inspector</span>
-              <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh folders</TooltipContent>
+              </Tooltip>
             </CardTitle>
             <CardDescription>
               {folders.length} audio folders found
@@ -345,7 +348,8 @@ export function AudioTab() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </ComingSoonOverlay>
     </div>
   );
 }

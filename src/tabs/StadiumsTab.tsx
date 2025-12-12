@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +10,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, AlertCircle, CheckCircle2, FolderOpen, Plus, Trash2, Save } from "lucide-react";
+import { RefreshCw, AlertCircle, FolderOpen, Plus, Trash2, Save, FileArchive } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Fm26Installation, BundleInfo, TeamMapping } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -19,9 +22,9 @@ export function StadiumsTab() {
   const [mappings, setMappings] = useState<TeamMapping[]>([]);
   const [originalMappings, setOriginalMappings] = useState<TeamMapping[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isInstallingStadiums, setIsInstallingStadiums] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Load installation on mount
@@ -135,17 +138,16 @@ export function StadiumsTab() {
 
     setIsSaving(true);
     setError(null);
-    setSuccess(null);
 
     try {
       await invoke("write_team_mappings", {
         install: installation,
         mappings,
       });
-      setSuccess("Team mappings saved successfully!");
+      toast.success("Team mappings saved successfully!");
       setOriginalMappings(mappings);
     } catch (err) {
-      setError(String(err));
+      toast.error("Failed to save mappings", { description: String(err) });
     } finally {
       setIsSaving(false);
     }
@@ -154,8 +156,36 @@ export function StadiumsTab() {
   const handleRevert = () => {
     setMappings(originalMappings);
     validateMappings(originalMappings, bundles);
-    setSuccess(null);
     setError(null);
+  };
+
+  const handleInstallCustomStadiums = async () => {
+    if (!installation) return;
+
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        title: "Select Custom Stadiums Zip File",
+        filters: [{ name: "Zip Archives", extensions: ["zip"] }],
+      });
+
+      if (selected && typeof selected === "string") {
+        setIsInstallingStadiums(true);
+        setError(null);
+
+        const filesExtracted = await invoke<number>("install_custom_stadiums_pack", {
+          zipPath: selected,
+          install: installation,
+        });
+
+        toast.success("Custom stadiums installed!", { description: `${filesExtracted} files extracted` });
+        await loadData(installation);
+      }
+    } catch (err) {
+      toast.error("Failed to install stadiums", { description: String(err) });
+    } finally {
+      setIsInstallingStadiums(false);
+    }
   };
 
   const hasChanges = JSON.stringify(mappings) !== JSON.stringify(originalMappings);
@@ -184,75 +214,33 @@ export function StadiumsTab() {
         </Alert>
       )}
 
-      {success && (
-        <Alert variant="success">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Success</AlertTitle>
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Bundles List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Stadium Bundles</span>
-            <div className="flex gap-2">
-              <Button onClick={handleOpenFolder} variant="outline" size="sm">
-                <FolderOpen className="mr-2 h-4 w-4" />
-                Open Folder
-              </Button>
-              <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              </Button>
-            </div>
-          </CardTitle>
-          <CardDescription>
-            {bundles.length} bundle files found in CustomStadium folder
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="max-h-64 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bundle File</TableHead>
-                  <TableHead>Modified</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bundles.map((bundle) => (
-                  <TableRow key={bundle.file_name}>
-                    <TableCell className="font-medium">{bundle.file_name}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {bundle.modified || "Unknown"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {bundles.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground">
-                      No bundle files found. Install custom stadiums first.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Team Mappings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Team Mappings</span>
-            <Badge variant={hasChanges ? "secondary" : "outline"}>
+            <Badge variant={hasChanges ? "warning" : "outline"}>
               {hasChanges ? "Unsaved Changes" : "Saved"}
             </Badge>
           </CardTitle>
           <CardDescription>
             Map team IDs to stadium bundles. Each team can only have one stadium.
+            <span className="block mt-1">
+              Need team IDs? Find them at{" "}
+              <a
+                href="https://fmref.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  open("https://fmref.com/");
+                }}
+              >
+                fmref.com
+              </a>{" "}
+              by SortItOutSI.
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -309,13 +297,18 @@ export function StadiumsTab() {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveMapping(index)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveMapping(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remove mapping</TooltipContent>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -349,6 +342,80 @@ export function StadiumsTab() {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Bundles List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Stadium Bundles</span>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleInstallCustomStadiums}
+                disabled={isInstallingStadiums}
+                size="sm"
+              >
+                {isInstallingStadiums ? (
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileArchive className="mr-2 h-4 w-4" />
+                )}
+                {isInstallingStadiums ? "Installing..." : "Install from Zip"}
+              </Button>
+              <Button onClick={handleOpenFolder} variant="outline" size="sm">
+                <FolderOpen className="mr-2 h-4 w-4" />
+                Open Folder
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh bundles</TooltipContent>
+              </Tooltip>
+            </div>
+          </CardTitle>
+          <CardDescription>
+            {bundles.length} bundle files found in CustomStadium folder
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8">
+              <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Loading stadiums...</span>
+            </div>
+          ) : (
+            <div className="max-h-64 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bundle File</TableHead>
+                    <TableHead>Modified</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bundles.map((bundle) => (
+                    <TableRow key={bundle.file_name}>
+                      <TableCell className="font-medium">{bundle.file_name}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {bundle.modified || "Unknown"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {bundles.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={2} className="text-center text-muted-foreground">
+                        No bundle files found. Install custom stadiums first.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

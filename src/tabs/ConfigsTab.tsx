@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, AlertCircle, CheckCircle2, Save, Settings, Volume2, Users, LayoutGrid } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { toast } from "sonner";
+import { RefreshCw, AlertCircle, Save, Settings, Volume2, Users, LayoutGrid } from "lucide-react";
+import { ComingSoonOverlay } from "@/components/ComingSoonOverlay";
 import type { Fm26Installation, StadiumInjectionConfig, BundleInfo, AudioInjectConfig, CrowdInjectConfig, AdboardsConfig } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -24,9 +27,7 @@ export function ConfigsTab() {
   const [adboardsConfig, setAdboardsConfig] = useState<AdboardsConfig | null>(null);
   const [originalAdboardsConfig, setOriginalAdboardsConfig] = useState<AdboardsConfig | null>(null);
   const [bundles, setBundles] = useState<BundleInfo[]>([]);
-  const [configFiles, setConfigFiles] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -58,13 +59,12 @@ export function ConfigsTab() {
 
   const loadData = async (install: Fm26Installation) => {
     try {
-      const [stadiumCfg, audioCfg, crowdCfg, adboardsCfg, bundleList, cfgFiles] = await Promise.all([
+      const [stadiumCfg, audioCfg, crowdCfg, adboardsCfg, bundleList] = await Promise.all([
         invoke<StadiumInjectionConfig>("read_stadium_injection_config", { install }),
         invoke<AudioInjectConfig>("read_audio_inject_config", { install }),
         invoke<CrowdInjectConfig>("read_crowd_inject_config", { install }),
         invoke<AdboardsConfig>("read_adboards_config", { install }),
         invoke<BundleInfo[]>("list_bundles", { install }),
-        invoke<string[]>("list_config_files", { install }),
       ]);
       setStadiumConfig(stadiumCfg);
       setOriginalStadiumConfig(stadiumCfg);
@@ -75,7 +75,6 @@ export function ConfigsTab() {
       setAdboardsConfig(adboardsCfg);
       setOriginalAdboardsConfig(adboardsCfg);
       setBundles(bundleList);
-      setConfigFiles(cfgFiles);
     } catch (err) {
       setError(String(err));
     }
@@ -94,7 +93,6 @@ export function ConfigsTab() {
 
     setIsSaving(true);
     setError(null);
-    setSuccess(null);
 
     try {
       const promises = [];
@@ -114,13 +112,13 @@ export function ConfigsTab() {
 
       await Promise.all(promises);
 
-      setSuccess("All configurations saved successfully!");
+      toast.success("All configurations saved!");
       setOriginalStadiumConfig(stadiumConfig);
       setOriginalAudioConfig(audioConfig);
       setOriginalCrowdConfig(crowdConfig);
       setOriginalAdboardsConfig(adboardsConfig);
     } catch (err) {
-      setError(String(err));
+      toast.error("Failed to save configurations", { description: String(err) });
     } finally {
       setIsSaving(false);
     }
@@ -131,7 +129,6 @@ export function ConfigsTab() {
     setAudioConfig(originalAudioConfig);
     setCrowdConfig(originalCrowdConfig);
     setAdboardsConfig(originalAdboardsConfig);
-    setSuccess(null);
     setError(null);
   };
 
@@ -201,14 +198,6 @@ export function ConfigsTab() {
         </Alert>
       )}
 
-      {success && (
-        <Alert variant="success">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Success</AlertTitle>
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      )}
-
       {/* Global Save/Revert Bar */}
       <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
         <div className="flex items-center gap-2">
@@ -234,118 +223,117 @@ export function ConfigsTab() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Audio Inject Config */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Volume2 className="h-5 w-5" />
-                <span>Audio Inject</span>
-              </div>
-              <Badge variant={hasAudioChanges ? "secondary" : "outline"}>
-                {hasAudioChanges ? "Modified" : "Saved"}
-              </Badge>
-            </CardTitle>
-            <CardDescription>
-              Configure custom audio injection (anthems, goal sounds)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {audioConfig && (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="enableAudio">Enable Audio Injection</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Master toggle for custom audio
-                    </p>
-                  </div>
-                  <Switch
-                    id="enableAudio"
-                    checked={audioConfig.enable_audio_injection}
-                    onCheckedChange={(checked) =>
-                      updateAudioConfig({ enable_audio_injection: checked })
-                    }
-                  />
+        <ComingSoonOverlay>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-5 w-5" />
+                  <span>Audio Inject</span>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="masterVolume">Master Volume</Label>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      id="masterVolume"
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      value={audioConfig.master_volume}
-                      onChange={(e) =>
-                        updateAudioConfig({ master_volume: parseFloat(e.target.value) })
+                <Badge variant={hasAudioChanges ? "warning" : "outline"}>
+                  {hasAudioChanges ? "Modified" : "Saved"}
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Configure custom audio injection (anthems, goal sounds)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {audioConfig && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="enableAudio">Enable Audio Injection</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Master toggle for custom audio
+                      </p>
+                    </div>
+                    <Switch
+                      id="enableAudio"
+                      checked={audioConfig.enable_audio_injection}
+                      onCheckedChange={(checked) =>
+                        updateAudioConfig({ enable_audio_injection: checked })
                       }
-                      className="flex-1"
                     />
-                    <span className="text-sm w-12 text-right">{Math.round(audioConfig.master_volume * 100)}%</span>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="musicVolume">Music Volume</Label>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      id="musicVolume"
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      value={audioConfig.music_volume}
-                      onChange={(e) =>
-                        updateAudioConfig({ music_volume: parseFloat(e.target.value) })
+                  <div className="space-y-2">
+                    <Label htmlFor="masterVolume">Master Volume</Label>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        id="masterVolume"
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        value={[audioConfig.master_volume]}
+                        onValueChange={([v]) =>
+                          updateAudioConfig({ master_volume: v })
+                        }
+                        className="flex-1"
+                      />
+                      <span className="text-sm w-12 text-right">{Math.round(audioConfig.master_volume * 100)}%</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="musicVolume">Music Volume</Label>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        id="musicVolume"
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        value={[audioConfig.music_volume]}
+                        onValueChange={([v]) =>
+                          updateAudioConfig({ music_volume: v })
+                        }
+                        className="flex-1"
+                      />
+                      <span className="text-sm w-12 text-right">{Math.round(audioConfig.music_volume * 100)}%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Anthems, halftime music</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="eventVolume">Event Volume</Label>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        id="eventVolume"
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        value={[audioConfig.event_volume]}
+                        onValueChange={([v]) =>
+                          updateAudioConfig({ event_volume: v })
+                        }
+                        className="flex-1"
+                      />
+                      <span className="text-sm w-12 text-right">{Math.round(audioConfig.event_volume * 100)}%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Goals, crowd reactions</p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="loopMusic">Loop Music</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Repeat music tracks
+                      </p>
+                    </div>
+                    <Switch
+                      id="loopMusic"
+                      checked={audioConfig.loop_music}
+                      onCheckedChange={(checked) =>
+                        updateAudioConfig({ loop_music: checked })
                       }
-                      className="flex-1"
                     />
-                    <span className="text-sm w-12 text-right">{Math.round(audioConfig.music_volume * 100)}%</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Anthems, halftime music</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="eventVolume">Event Volume</Label>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      id="eventVolume"
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      value={audioConfig.event_volume}
-                      onChange={(e) =>
-                        updateAudioConfig({ event_volume: parseFloat(e.target.value) })
-                      }
-                      className="flex-1"
-                    />
-                    <span className="text-sm w-12 text-right">{Math.round(audioConfig.event_volume * 100)}%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Goals, crowd reactions</p>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="loopMusic">Loop Music</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Repeat music tracks
-                    </p>
-                  </div>
-                  <Switch
-                    id="loopMusic"
-                    checked={audioConfig.loop_music}
-                    onCheckedChange={(checked) =>
-                      updateAudioConfig({ loop_music: checked })
-                    }
-                  />
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </ComingSoonOverlay>
 
         {/* Crowd Inject Config */}
         <Card>
@@ -355,7 +343,7 @@ export function ConfigsTab() {
                 <Users className="h-5 w-5" />
                 <span>Crowd Inject</span>
               </div>
-              <Badge variant={hasCrowdChanges ? "secondary" : "outline"}>
+              <Badge variant={hasCrowdChanges ? "warning" : "outline"}>
                 {hasCrowdChanges ? "Modified" : "Saved"}
               </Badge>
             </CardTitle>
@@ -385,15 +373,14 @@ export function ConfigsTab() {
                 <div className="space-y-2">
                   <Label htmlFor="crowdDensity">Crowd Density</Label>
                   <div className="flex items-center gap-3">
-                    <Input
+                    <Slider
                       id="crowdDensity"
-                      type="range"
                       min={10}
                       max={100}
                       step={10}
-                      value={crowdConfig.crowd_density}
-                      onChange={(e) =>
-                        updateCrowdConfig({ crowd_density: parseInt(e.target.value) })
+                      value={[crowdConfig.crowd_density]}
+                      onValueChange={([v]) =>
+                        updateCrowdConfig({ crowd_density: v })
                       }
                       className="flex-1"
                     />
@@ -483,7 +470,7 @@ export function ConfigsTab() {
                 <LayoutGrid className="h-5 w-5" />
                 <span>Adboards</span>
               </div>
-              <Badge variant={hasAdboardsChanges ? "secondary" : "outline"}>
+              <Badge variant={hasAdboardsChanges ? "warning" : "outline"}>
                 {hasAdboardsChanges ? "Modified" : "Saved"}
               </Badge>
             </CardTitle>
@@ -517,7 +504,7 @@ export function ConfigsTab() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Stadium Injection</span>
-              <Badge variant={hasStadiumChanges ? "secondary" : "outline"}>
+              <Badge variant={hasStadiumChanges ? "warning" : "outline"}>
                 {hasStadiumChanges ? "Modified" : "Saved"}
               </Badge>
             </CardTitle>
@@ -638,37 +625,6 @@ export function ConfigsTab() {
           </CardContent>
         </Card>
 
-        {/* Config Files List */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              <span>Config Files</span>
-            </CardTitle>
-            <CardDescription>
-              BepInEx plugin configuration files in {installation.config_path}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 md:grid-cols-3">
-              {configFiles.length > 0 ? (
-                configFiles.map((file) => (
-                  <div
-                    key={file}
-                    className="flex items-center gap-2 text-sm p-2 rounded-md bg-muted/50"
-                  >
-                    <Settings className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className="font-mono text-xs truncate">{file}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4 md:col-span-3">
-                  No config files found. Install BepInEx plugins first.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

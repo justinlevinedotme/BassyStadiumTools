@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, AlertCircle, Trash2, FileText, Search, Download, Play, Pause } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Fm26Installation, LogInfo } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -19,6 +20,7 @@ export function LogsTab() {
   const [logContent, setLogContent] = useState<string>("");
   const [logInfo, setLogInfo] = useState<LogInfo | null>(null);
   const [filter, setFilter] = useState<string>("");
+  const [levelFilter, setLevelFilter] = useState<string>("all");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -142,28 +144,41 @@ export function LogsTab() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
-  const getFilteredLines = (): string[] => {
-    const lines = logContent.split("\n");
-    if (!filter.trim()) return lines;
+  const getLogLevel = (line: string): string => {
+    if (line.includes("[Error") || line.includes("[Error]")) return "error";
+    if (line.includes("[Warning") || line.includes("[Warning]")) return "warning";
+    if (line.includes("[Info") || line.includes("[Info]")) return "info";
+    if (line.includes("[Debug") || line.includes("[Debug]")) return "debug";
+    if (line.includes("[Message") || line.includes("[Message]")) return "message";
+    return "other";
+  };
 
-    const filterLower = filter.toLowerCase();
-    return lines.filter((line) => line.toLowerCase().includes(filterLower));
+  const getFilteredLines = (): string[] => {
+    let lines = logContent.split("\n");
+
+    // Filter by level
+    if (levelFilter !== "all") {
+      lines = lines.filter((line) => getLogLevel(line) === levelFilter);
+    }
+
+    // Filter by text search
+    if (filter.trim()) {
+      const filterLower = filter.toLowerCase();
+      lines = lines.filter((line) => line.toLowerCase().includes(filterLower));
+    }
+
+    return lines;
   };
 
   const filteredLines = getFilteredLines();
-  const logLevelColors: Record<string, string> = {
-    "[Error]": "text-red-500",
-    "[Warning]": "text-yellow-500",
-    "[Info]": "text-blue-400",
-    "[Debug]": "text-gray-400",
-    "[Message]": "text-green-400",
-  };
 
   const getLineClass = (line: string): string => {
-    for (const [level, className] of Object.entries(logLevelColors)) {
-      if (line.includes(level)) return className;
-    }
-    return "";
+    if (line.includes("[Error") || line.includes("[Error]")) return "text-red-500";
+    if (line.includes("[Warning") || line.includes("[Warning]")) return "text-yellow-500";
+    if (line.includes("[Info") || line.includes("[Info]")) return "text-blue-400";
+    if (line.includes("[Debug") || line.includes("[Debug]")) return "text-gray-400";
+    if (line.includes("[Message") || line.includes("[Message]")) return "text-green-400";
+    return "text-muted-foreground";
   };
 
   if (!installation) {
@@ -198,25 +213,40 @@ export function LogsTab() {
               <span>BepInEx Log</span>
             </div>
             <div className="flex gap-2">
-              <Button
-                onClick={handleExport}
-                variant="outline"
-                size="sm"
-                disabled={!logContent}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleClear}
-                variant="outline"
-                size="sm"
-                disabled={!logContent}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-              <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleExport}
+                    variant="outline"
+                    size="sm"
+                    disabled={!logContent}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Export log</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleClear}
+                    variant="outline"
+                    size="sm"
+                    disabled={!logContent}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear log</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
             </div>
           </CardTitle>
           <CardDescription className="flex items-center gap-4">
@@ -286,7 +316,20 @@ export function LogsTab() {
               onChange={(e) => setFilter(e.target.value)}
               className="flex-1"
             />
-            {filter && (
+            <Select value={levelFilter} onValueChange={setLevelFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Levels</SelectItem>
+                <SelectItem value="error"><span className="text-red-500">Error</span></SelectItem>
+                <SelectItem value="warning"><span className="text-yellow-500">Warning</span></SelectItem>
+                <SelectItem value="info"><span className="text-blue-400">Info</span></SelectItem>
+                <SelectItem value="message"><span className="text-green-400">Message</span></SelectItem>
+                <SelectItem value="debug"><span className="text-gray-400">Debug</span></SelectItem>
+              </SelectContent>
+            </Select>
+            {(filter || levelFilter !== "all") && (
               <Badge variant="secondary">
                 {filteredLines.length} / {logContent.split("\n").length} lines
               </Badge>
