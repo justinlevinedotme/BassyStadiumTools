@@ -28,6 +28,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
     "resources": ["resources/*"],
     "windows": {
       "certificateThumbprint": null,
