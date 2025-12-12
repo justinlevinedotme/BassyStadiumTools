@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FolderOpen, Download, RefreshCw, AlertCircle, CheckCircle2, FileArchive, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { trackEvent } from "@/lib/analytics";
 import type { Fm26Installation, PluginStatus } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -45,6 +46,7 @@ export function GameTab() {
     try {
       const paths = await invoke<string[]>("detect_fm26_paths");
       setDetectedPaths(paths);
+      trackEvent("fm26_autodetect", { paths_found: paths.length });
 
       // If exactly one path found, auto-select it
       if (paths.length === 1) {
@@ -54,6 +56,7 @@ export function GameTab() {
     } catch (err) {
       // Silent fail for auto-detect - user can browse manually
       console.error("Auto-detect failed:", err);
+      trackEvent("error_occurred", { type: "fm26_autodetect", message: String(err) });
     } finally {
       setIsDetecting(false);
     }
@@ -79,10 +82,14 @@ export function GameTab() {
 
       // Save path to localStorage
       localStorage.setItem(STORAGE_KEY, path);
+
+      const installedPlugins = pluginStatus.filter(p => p.installed).length;
+      trackEvent("fm26_loaded", { plugins_installed: installedPlugins, plugins_total: pluginStatus.length });
     } catch (err) {
       setError(String(err));
       setInstallation(null);
       setPlugins([]);
+      trackEvent("error_occurred", { type: "fm26_load", message: String(err) });
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +121,7 @@ export function GameTab() {
     try {
       await invoke("install_bepinex_pack", { install: installation });
       toast.success("BepInEx Stadium Pack installed!");
+      trackEvent("stadium_pack_installed");
 
       // Refresh plugin status
       const pluginStatus = await invoke<PluginStatus[]>("get_plugin_status", {
@@ -122,6 +130,7 @@ export function GameTab() {
       setPlugins(pluginStatus);
     } catch (err) {
       toast.error("Failed to install BepInEx", { description: String(err) });
+      trackEvent("error_occurred", { type: "stadium_pack_install", message: String(err) });
     } finally {
       setIsInstalling(false);
     }
@@ -153,9 +162,11 @@ export function GameTab() {
         });
 
         toast.success("Custom stadiums installed!", { description: `${filesExtracted} files extracted` });
+        trackEvent("custom_stadiums_installed", { files: filesExtracted });
       }
     } catch (err) {
       toast.error("Failed to install stadiums", { description: String(err) });
+      trackEvent("error_occurred", { type: "custom_stadiums_install", message: String(err) });
     } finally {
       setIsInstallingStadiums(false);
     }

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -11,8 +12,26 @@ import { StadiumsTab } from "@/tabs/StadiumsTab";
 import { AudioTab } from "@/tabs/AudioTab";
 import { ConfigsTab } from "@/tabs/ConfigsTab";
 import { LogsTab } from "@/tabs/LogsTab";
+import { ConsentDialog } from "@/components/ConsentDialog";
+import { hasAskedForConsent, initAnalytics, isAnalyticsEnabled, trackEvent } from "@/lib/analytics";
 
 function App() {
+  const [showConsent, setShowConsent] = useState(false);
+
+  useEffect(() => {
+    // Check if we need to show consent dialog
+    if (!hasAskedForConsent()) {
+      setShowConsent(true);
+    } else if (isAnalyticsEnabled()) {
+      // User already consented, initialize analytics
+      initAnalytics();
+    }
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    trackEvent("tab_viewed", { tab: value });
+  };
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background flex flex-col">
@@ -24,7 +43,7 @@ function App() {
             <h4 className="mb-6 text-1xl text-muted-foreground">
               by Justin Levine (jalco) for BassyBoy
             </h4>
-            <Tabs defaultValue="game" className="w-full">
+            <Tabs defaultValue="game" className="w-full" onValueChange={handleTabChange}>
               <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="game" className="flex items-center gap-2">
                   <MdFileDownload className="h-4 w-4" />
@@ -89,6 +108,7 @@ function App() {
           </div>
         </footer>
         <Toaster position="bottom-right" />
+        <ConsentDialog open={showConsent} onClose={() => setShowConsent(false)} />
       </div>
     </TooltipProvider>
   );

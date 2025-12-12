@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-shell";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, AlertCircle, FolderOpen, Plus, Trash2, Save, FileArchive } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { trackEvent } from "@/lib/analytics";
 import type { Fm26Installation, BundleInfo, TeamMapping } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -63,15 +64,22 @@ export function StadiumsTab() {
       setMappings(mappingList);
       setOriginalMappings(mappingList);
       validateMappings(mappingList, bundleList);
+      trackEvent("stadiums_loaded", { bundles: bundleList.length, mappings: mappingList.length });
     } catch (err) {
       setError(String(err));
+      trackEvent("error_occurred", { type: "stadiums_load", message: String(err) });
     }
   };
 
   const handleRefresh = async () => {
     if (installation) {
       setIsLoading(true);
-      await loadData(installation);
+      try {
+        await loadData(installation);
+        trackEvent("bundles_refreshed", { count: bundles.length });
+      } catch (err) {
+        trackEvent("error_occurred", { type: "bundles_refresh", message: String(err) });
+      }
       setIsLoading(false);
     }
   };
@@ -79,9 +87,10 @@ export function StadiumsTab() {
   const handleOpenFolder = async () => {
     if (installation) {
       try {
-        await open(installation.custom_stadium_path);
+        await revealItemInDir(installation.custom_stadium_path);
       } catch (err) {
         setError(String(err));
+        trackEvent("error_occurred", { type: "open_folder", message: String(err) });
       }
     }
   };
@@ -125,12 +134,14 @@ export function StadiumsTab() {
     const newMappings = [...mappings, newMapping];
     setMappings(newMappings);
     validateMappings(newMappings, bundles);
+    trackEvent("mapping_added");
   };
 
   const handleRemoveMapping = (index: number) => {
     const newMappings = mappings.filter((_, i) => i !== index);
     setMappings(newMappings);
     validateMappings(newMappings, bundles);
+    trackEvent("mapping_removed");
   };
 
   const handleSave = async () => {
@@ -146,8 +157,10 @@ export function StadiumsTab() {
       });
       toast.success("Team mappings saved successfully!");
       setOriginalMappings(mappings);
+      trackEvent("team_mappings_saved", { count: mappings.length });
     } catch (err) {
       toast.error("Failed to save mappings", { description: String(err) });
+      trackEvent("error_occurred", { type: "team_mappings_save", message: String(err) });
     } finally {
       setIsSaving(false);
     }
@@ -179,10 +192,12 @@ export function StadiumsTab() {
         });
 
         toast.success("Custom stadiums installed!", { description: `${filesExtracted} files extracted` });
+        trackEvent("custom_stadiums_installed", { files: filesExtracted });
         await loadData(installation);
       }
     } catch (err) {
       toast.error("Failed to install stadiums", { description: String(err) });
+      trackEvent("error_occurred", { type: "custom_stadiums_install", message: String(err) });
     } finally {
       setIsInstallingStadiums(false);
     }

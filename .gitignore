@@ -12,6 +12,7 @@ node_modules/
 
 # dotenv environment variables file
 .env
+src-tauri/.env
 
 # .vscode workspace settings file
 .vscode/settings.json

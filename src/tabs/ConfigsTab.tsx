@@ -10,8 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { RefreshCw, AlertCircle, Save, Settings, Volume2, Users, LayoutGrid } from "lucide-react";
+import { RefreshCw, AlertCircle, Save, Settings, Volume2, Users, LayoutGrid, BarChart3 } from "lucide-react";
 import { ComingSoonOverlay } from "@/components/ComingSoonOverlay";
+import { isAnalyticsEnabled, setAnalyticsEnabled, trackEvent } from "@/lib/analytics";
 import type { Fm26Installation, StadiumInjectionConfig, BundleInfo, AudioInjectConfig, CrowdInjectConfig, AdboardsConfig } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -30,6 +31,7 @@ export function ConfigsTab() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabledState] = useState(isAnalyticsEnabled());
 
   // Load installation on mount
   useEffect(() => {
@@ -117,8 +119,10 @@ export function ConfigsTab() {
       setOriginalAudioConfig(audioConfig);
       setOriginalCrowdConfig(crowdConfig);
       setOriginalAdboardsConfig(adboardsConfig);
+      trackEvent("config_saved");
     } catch (err) {
       toast.error("Failed to save configurations", { description: String(err) });
+      trackEvent("error_occurred", { type: "config_save", message: String(err) });
     } finally {
       setIsSaving(false);
     }
@@ -626,6 +630,40 @@ export function ConfigsTab() {
         </Card>
 
       </div>
+
+      {/* Analytics & Privacy */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            <span>Analytics & Privacy</span>
+          </CardTitle>
+          <CardDescription>
+            Help improve BassyStadiumTools by sharing anonymous usage data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="analyticsToggle">Enable Anonymous Analytics</Label>
+              <p className="text-xs text-muted-foreground">
+                We collect anonymous usage data to understand how the app is used, catch errors, and prioritize new features. No personal information is ever collected.
+              </p>
+            </div>
+            <Switch
+              id="analyticsToggle"
+              checked={analyticsEnabled}
+              onCheckedChange={(checked) => {
+                setAnalyticsEnabled(checked);
+                setAnalyticsEnabledState(checked);
+                if (checked) {
+                  trackEvent("analytics_enabled");
+                }
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
