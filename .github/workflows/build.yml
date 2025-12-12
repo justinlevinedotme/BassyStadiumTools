@@ -1,0 +1,331 @@
+name: Build to release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (test version sync without building)"
+        type: boolean
+        default: false
+      test_build:
+        description: "Test build (build artifacts without release)"
+        type: boolean
+        default: false
+      test_version:
+        description: "Test version (e.g., 1.2.3) - only used in dry run"
+        type: string
+        default: ""
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.sync.outputs.version }}
+      changed: ${{ steps.sync.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Sync version files to tag
+        id: sync
+        shell: bash
+        run: |
+          # Determine version from tag or input
+          if [[ "${{ inputs.dry_run }}" == "true" && -n "${{ inputs.test_version }}" ]]; then
+            VERSION="${{ inputs.test_version }}"
+            echo "::notice::DRY RUN: Testing with version $VERSION"
+          elif [[ "${{ inputs.test_build }}" == "true" ]]; then
+            VERSION=$(node -p "require('./package.json').version")
+            echo "::notice::TEST BUILD: Using current version $VERSION"
+          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            echo "::error::This workflow must be triggered by a version tag (v*) or with test_build enabled."
+            echo "::error::Got ref: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          # Validate version is semver-ish (x.y.z with optional pre-release)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected semver like 1.2.3)"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Target version: $VERSION"
+
+          # Read current versions
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep -m1 '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+
+          echo ""
+          echo "Current versions:"
+          echo "   package.json:     $PKG_VERSION"
+          echo "   Cargo.toml:       $CARGO_VERSION"
+          echo "   tauri.conf.json:  $TAURI_VERSION"
+          echo ""
+
+          # Check if sync needed
+          CHANGED="false"
+          if [[ "$PKG_VERSION" != "$VERSION" || "$CARGO_VERSION" != "$VERSION" || "$TAURI_VERSION" != "$VERSION" ]]; then
+            CHANGED="true"
+            echo "Version mismatch detected - syncing..."
+          else
+            echo "All versions match tag"
+          fi
+
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo ""
+            echo "DRY RUN - Would update to version $VERSION"
+            echo "   No files modified"
+            exit 0
+          fi
+
+          if [[ "$CHANGED" == "true" ]]; then
+            # Update package.json
+            pnpm version "$VERSION" --no-git-tag-version --allow-same-version
+
+            # Update Cargo.toml
+            sed -i '0,/^version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/s//version = "'"$VERSION"'"/' src-tauri/Cargo.toml
+
+            # Update tauri.conf.json
+            node -e "
+              const fs = require('fs');
+              const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+              conf.version = '$VERSION';
+              fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+            "
+
+            echo ""
+            echo "Updated versions:"
+            echo "   package.json:     $(node -p "require('./package.json').version")"
+            echo "   Cargo.toml:       $(grep -m1 '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')"
+            echo "   tauri.conf.json:  $(node -p "require('./src-tauri/tauri.conf.json').version")"
+          fi
+
+      - name: Upload synced source
+        if: ${{ inputs.dry_run != true }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: synced-source
+          path: |
+            package.json
+            src-tauri/Cargo.toml
+            src-tauri/tauri.conf.json
+          retention-days: 1
+
+  build-windows:
+    needs: sync-version
+    if: inputs.dry_run != true && (github.event_name == 'push' || inputs.test_build == true)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Download synced version files
+        uses: actions/download-artifact@v6
+        with:
+          name: synced-source
+
+      - name: Apply synced version files
+        shell: bash
+        run: |
+          # The artifact preserves directory structure
+          if [ -f synced-source/package.json ]; then
+            cp synced-source/package.json ./package.json
+          fi
+          if [ -f synced-source/src-tauri/Cargo.toml ]; then
+            cp synced-source/src-tauri/Cargo.toml ./src-tauri/Cargo.toml
+          fi
+          if [ -f synced-source/src-tauri/tauri.conf.json ]; then
+            cp synced-source/src-tauri/tauri.conf.json ./src-tauri/tauri.conf.json
+          fi
+          # Also check if files are directly in artifact root
+          if [ -f package.json ] && [ -f Cargo.toml ]; then
+            mv Cargo.toml src-tauri/Cargo.toml
+            mv tauri.conf.json src-tauri/tauri.conf.json 2>/dev/null || true
+          fi
+          echo "Version files applied:"
+          echo "   package.json:     $(node -p "require('./package.json').version")"
+          echo "   Cargo.toml:       $(grep -m1 '^version = ' src-tauri/Cargo.toml | sed 's/version = \"\(.*\)\"/\1/')"
+          echo "   tauri.conf.json:  $(node -p "require('./src-tauri/tauri.conf.json').version")"
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}
+          restore-keys: |
+            windows-cargo-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (test mode - no release)
+        if: inputs.test_build == true
+        id: tauri_test
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          args: --verbose
+
+      - name: Build & publish (release mode)
+        if: inputs.test_build != true
+        id: tauri_release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "BassyStadiumTools ${{ github.ref_name }}"
+          releaseBody: "Building artifacts..."
+          releaseDraft: true
+          prerelease: false
+          args: --verbose
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v5
+        with:
+          name: tauri-bundles-windows-${{ inputs.test_build == true && 'test' || github.ref_name }}
+          path: ${{ inputs.test_build == true && steps.tauri_test.outputs.artifactPaths || steps.tauri_release.outputs.artifactPaths }}
+
+  finalize-release:
+    needs: [sync-version, build-windows]
+    if: inputs.dry_run != true && inputs.test_build != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: tauri-bundles-windows-${{ github.ref_name }}
+          path: artifacts
+
+      - name: Generate latest.json for Tauri updater
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          echo "Generating latest.json for version $VERSION"
+
+          # Find the NSIS zip and signature files
+          NSIS_ZIP=$(find artifacts -name "*.nsis.zip" | head -1)
+          NSIS_SIG=$(find artifacts -name "*.nsis.zip.sig" | head -1)
+
+          if [ -z "$NSIS_ZIP" ] || [ -z "$NSIS_SIG" ]; then
+            echo "::error::Could not find NSIS bundle or signature"
+            ls -la artifacts/
+            exit 1
+          fi
+
+          # Read signature content
+          SIGNATURE=$(cat "$NSIS_SIG")
+
+          # Get release notes from GitHub
+          NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$TAG" \
+            --jq '.body' | jq -Rs '.')
+
+          # Generate latest.json
+          cat > latest.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": $NOTES,
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "$SIGNATURE",
+                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/$(basename $NSIS_ZIP)"
+              }
+            }
+          }
+          EOF
+
+          echo "Generated latest.json:"
+          cat latest.json
+
+      - name: Upload latest.json to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release upload "$TAG" latest.json --repo "${{ github.repository }}" --clobber
+
+      - name: Generate release notes and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          # Get auto-generated release notes from GitHub
+          NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$TAG" \
+            --jq '.body')
+
+          # Append installation footer
+          FOOTER="
+
+          ---
+
+          ### Installation
+
+          Download the Windows installer:
+          - **Windows:** \`BassyStadiumTools_${VERSION}_x64-setup.exe\`
+
+          > *Ignore \`.zip\` / \`.sig\` files - they are used by the auto-updater.*"
+
+          FULL_BODY="${NOTES}${FOOTER}"
+
+          # Update the release with notes and publish (undraft)
+          gh release edit "$TAG" \
+            --repo "${{ github.repository }}" \
+            --notes "$FULL_BODY" \
+            --draft=false

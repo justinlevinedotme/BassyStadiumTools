@@ -78,3 +78,40 @@ src-tauri/target/x86_64-pc-windows-gnu/release/bundle/
 │       └── bepinex_pack.zip  # Bundled mod pack
 └── package.json
 ```
+
+## Release Workflow
+
+Releases are automated via GitHub Actions. When you push a version tag (e.g., `v1.0.0`), the workflow will:
+
+1. Sync the version across `package.json`, `Cargo.toml`, and `tauri.conf.json`
+2. Build the Windows installer with code signing
+3. Generate `latest.json` for Tauri auto-updater
+4. Create a GitHub Release with the artifacts
+
+### Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Private key for signing Tauri updates |
+| `TAURI_KEY_PASSWORD` | Password for the signing key |
+
+### Generating Signing Keys
+
+```bash
+# Generate a new signing key pair
+pnpm tauri signer generate -w ~/.tauri/BassyStadiumTools.key
+
+# This outputs:
+# - Private key (add to TAURI_SIGNING_PRIVATE_KEY secret)
+# - Public key (add to tauri.conf.json plugins.updater.pubkey)
+```
+
+### Manual Release
+
+```bash
+# Create and push a version tag
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow also supports manual dispatch with dry-run and test-build options.

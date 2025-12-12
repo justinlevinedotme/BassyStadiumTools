@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { open } from "@tauri-apps/plugin-shell";
+import { getVersion } from "@tauri-apps/api/app";
 import { Heart } from "lucide-react";
 import { MdFileDownload, MdStadium, MdAudioFile } from "react-icons/md";
 import { FaCog } from "react-icons/fa";
@@ -11,8 +13,15 @@ import { StadiumsTab } from "@/tabs/StadiumsTab";
 import { AudioTab } from "@/tabs/AudioTab";
 import { ConfigsTab } from "@/tabs/ConfigsTab";
 import { LogsTab } from "@/tabs/LogsTab";
+import { UpdateChecker } from "@/components/UpdateChecker";
 
 function App() {
+  const [version, setVersion] = useState<string>("");
+
+  useEffect(() => {
+    getVersion().then(setVersion);
+  }, []);
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background flex flex-col">
@@ -71,24 +80,28 @@ function App() {
           </div>
         </div>
         <footer className="border-t bg-background py-3 px-6">
-          <div className="mx-auto max-w-6xl text-left text-sm text-muted-foreground">
-            App made with <Heart className="inline h-4 w-4 text-red-500 fill-red-500" /> by{" "}
-            <a
-              href="https://github.com/justinlevinedotme"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline hover:no-underline"
-              onClick={(e) => {
-                e.preventDefault();
-                open("https://github.com/justinlevinedotme");
-              }}
-            >
-              justinlevinedotme/notJALCO
-            </a>{" "}
-            for BassyBoy
+          <div className="mx-auto max-w-6xl flex justify-between text-sm text-muted-foreground">
+            <div>
+              App made with <Heart className="inline h-4 w-4 text-red-500 fill-red-500" /> by{" "}
+              <a
+                href="https://github.com/justinlevinedotme"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  open("https://github.com/justinlevinedotme");
+                }}
+              >
+                justinlevinedotme/notJALCO
+              </a>{" "}
+              for BassyBoy
+            </div>
+            {version && <div>v{version}</div>}
           </div>
         </footer>
         <Toaster position="bottom-right" />
+        <UpdateChecker />
       </div>
     </TooltipProvider>
   );
