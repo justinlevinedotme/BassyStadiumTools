@@ -46,7 +46,6 @@ jobs:
         id: sync
         shell: bash
         run: |
-          # Determine version from tag or input
           if [[ "${{ inputs.dry_run }}" == "true" && -n "${{ inputs.test_version }}" ]]; then
             VERSION="${{ inputs.test_version }}"
             echo "::notice::DRY RUN: Testing with version $VERSION"
@@ -61,7 +60,6 @@ jobs:
             exit 1
           fi
 
-          # Validate version is semver-ish (x.y.z with optional pre-release)
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
             echo "::error::Invalid version format: $VERSION (expected semver like 1.2.3)"
             exit 1
@@ -70,7 +68,6 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Target version: $VERSION"
 
-          # Read current versions
           PKG_VERSION=$(node -p "require('./package.json').version")
           CARGO_VERSION=$(grep -m1 '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
           TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
@@ -82,7 +79,6 @@ jobs:
           echo "   tauri.conf.json:  $TAURI_VERSION"
           echo ""
 
-          # Check if sync needed
           CHANGED="false"
           if [[ "$PKG_VERSION" != "$VERSION" || "$CARGO_VERSION" != "$VERSION" || "$TAURI_VERSION" != "$VERSION" ]]; then
             CHANGED="true"
@@ -101,13 +97,8 @@ jobs:
           fi
 
           if [[ "$CHANGED" == "true" ]]; then
-            # Update package.json
             pnpm version "$VERSION" --no-git-tag-version --allow-same-version
-
-            # Update Cargo.toml
             sed -i '0,/^version = "[0-9]\+\.[0-9]\+\.[0-9]\+"/s//version = "'"$VERSION"'"/' src-tauri/Cargo.toml
-
-            # Update tauri.conf.json
             node -e "
               const fs = require('fs');
               const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
@@ -123,7 +114,7 @@ jobs:
           fi
 
       - name: Upload synced source
-        if: ${{ inputs.dry_run != true }}
+        if: inputs.dry_run != true
         uses: actions/upload-artifact@v5
         with:
           name: synced-source
@@ -156,7 +147,6 @@ jobs:
       - name: Apply synced version files
         shell: bash
         run: |
-          # The artifact preserves directory structure
           if [ -f synced-source/package.json ]; then
             cp synced-source/package.json ./package.json
           fi
@@ -166,7 +156,6 @@ jobs:
           if [ -f synced-source/src-tauri/tauri.conf.json ]; then
             cp synced-source/src-tauri/tauri.conf.json ./src-tauri/tauri.conf.json
           fi
-          # Also check if files are directly in artifact root
           if [ -f package.json ] && [ -f Cargo.toml ]; then
             mv Cargo.toml src-tauri/Cargo.toml
             mv tauri.conf.json src-tauri/tauri.conf.json 2>/dev/null || true
@@ -221,76 +210,108 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "BassyStadiumTools ${{ github.ref_name }}"
-          releaseBody: |
-            ## Installation
-
-            Download the Windows installer:
-            - **Windows:** `BassyStadiumTools_${{ needs.sync-version.outputs.version }}_x64-setup.exe`
-
-            > *The `.sig` and `latest.json` files are used by the auto-updater.*
-          releaseDraft: false
+          releaseBody: "Building artifacts..."
+          releaseDraft: true
           prerelease: false
           updaterJsonPreferNsis: true
           args: --verbose
 
-      - name: Upload updater files
-        if: inputs.test_build != true
-        shell: bash
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v5
+        with:
+          name: tauri-bundles-windows-${{ inputs.test_build == true && 'test' || github.ref_name }}
+          path: ${{ inputs.test_build == true && steps.tauri_test.outputs.artifactPaths || steps.tauri_release.outputs.artifactPaths }}
+
+  finalize-release:
+    needs: [sync-version, build-windows]
+    if: inputs.dry_run != true && inputs.test_build != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: tauri-bundles-windows-${{ github.ref_name }}
+          path: artifacts
+
+      - name: Upload updater files to release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ needs.sync-version.outputs.version }}"
-          TAG="${{ github.ref_name }}"
-          BUNDLE_DIR="src-tauri/target/release/bundle"
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
 
-          echo "=== Bundle directory contents ==="
-          find "$BUNDLE_DIR" -type f | sort
+          echo "=== Downloaded artifacts ==="
+          find artifacts -type f | sort
 
-          # Upload the NSIS zip (required for updater)
-          NSIS_ZIP="$BUNDLE_DIR/nsis/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip"
-          if [ -f "$NSIS_ZIP" ]; then
-            echo "Uploading NSIS zip for updater..."
-            gh release upload "$TAG" "$NSIS_ZIP" --clobber
-          else
-            echo "Warning: NSIS zip not found at $NSIS_ZIP"
+          NSIS_ZIP=$(find artifacts -name "*.nsis.zip" -type f | head -1)
+          if [ -n "$NSIS_ZIP" ]; then
+            echo "Uploading NSIS zip: $NSIS_ZIP"
+            gh release upload "$TAG" "$NSIS_ZIP" --repo "${{ github.repository }}" --clobber
           fi
 
-          # Upload all signature files
-          echo "Uploading signature files..."
-          for sigfile in "$BUNDLE_DIR"/nsis/*.sig "$BUNDLE_DIR"/msi/*.sig; do
-            if [ -f "$sigfile" ]; then
-              filename=$(basename "$sigfile")
-              echo "  Uploading $filename..."
-              gh release upload "$TAG" "$sigfile" --clobber || echo "  Warning: Failed to upload $filename"
-            fi
+          for sigfile in $(find artifacts -name "*.sig" -type f); do
+            echo "Uploading signature: $sigfile"
+            gh release upload "$TAG" "$sigfile" --repo "${{ github.repository }}" --clobber
           done
 
-          # Generate latest.json for the updater
-          NSIS_SIG="$BUNDLE_DIR/nsis/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip.sig"
-          if [ -f "$NSIS_SIG" ]; then
-            echo "Generating latest.json..."
+          NSIS_SIG=$(find artifacts -name "*.nsis.zip.sig" -type f | head -1)
+          if [ -n "$NSIS_SIG" ] && [ -n "$NSIS_ZIP" ]; then
             SIGNATURE=$(cat "$NSIS_SIG")
+            NSIS_FILENAME=$(basename "$NSIS_ZIP")
             PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            DOWNLOAD_URL="https://github.com/justinlevinedotme/BassyStadiumTools/releases/download/${TAG}/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip"
+            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${NSIS_FILENAME}"
 
-            printf '%s\n' "{" \
-              "  \"version\": \"${VERSION}\"," \
-              "  \"notes\": \"See release notes on GitHub\"," \
-              "  \"pub_date\": \"${PUB_DATE}\"," \
-              "  \"platforms\": {" \
-              "    \"windows-x86_64\": {" \
-              "      \"signature\": \"${SIGNATURE}\"," \
-              "      \"url\": \"${DOWNLOAD_URL}\"" \
-              "    }" \
-              "  }" \
-              "}" > latest.json
+            cat > latest.json << ENDJSON
+          {
+            "version": "${VERSION}",
+            "notes": "See release notes on GitHub",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "${SIGNATURE}",
+                "url": "${DOWNLOAD_URL}"
+              }
+            }
+          }
+          ENDJSON
 
-            echo "Uploading latest.json..."
-            gh release upload "$TAG" latest.json --clobber
-            echo "=== latest.json contents ==="
+            echo "=== latest.json ==="
             cat latest.json
+            gh release upload "$TAG" latest.json --repo "${{ github.repository }}" --clobber
           else
-            echo "ERROR: NSIS signature file not found at $NSIS_SIG"
-            exit 1
+            echo "Warning: No NSIS signature file found"
           fi
 
+      - name: Generate release notes and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$TAG" \
+            --jq '.body') || NOTES="Release ${VERSION}"
+
+          read -r -d '' FOOTER << 'ENDFOOT' || true
+
+          ---
+
+          ## Installation
+
+          Download the Windows installer:
+          - **Windows:** BassyStadiumTools_${VERSION}_x64-setup.exe
+
+          > *The .sig and latest.json files are used by the auto-updater.*
+          ENDFOOT
+
+          FOOTER=$(echo "$FOOTER" | sed "s/\${VERSION}/${VERSION}/g")
+          FULL_BODY="${NOTES}${FOOTER}"
+
+          gh release edit "$TAG" \
+            --repo "${{ github.repository }}" \
+            --notes "$FULL_BODY" \
+            --draft=false
