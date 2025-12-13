@@ -63,5 +63,5 @@ dist/
 # Tauri
 src-tauri/target/
 
-# Large binary resources (keep in repo but exclude from some operations)
-# src-tauri/resources/bepinex_pack.zip
+# Large binary resources (downloaded from R2 at runtime)
+src-tauri/resources/bepinex_pack.zip
