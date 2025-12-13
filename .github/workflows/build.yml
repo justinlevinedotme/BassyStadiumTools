@@ -221,7 +221,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: tauri-bundles-windows-${{ inputs.test_build == true && 'test' || github.ref_name }}
-          path: ${{ inputs.test_build == true && steps.tauri_test.outputs.artifactPaths || steps.tauri_release.outputs.artifactPaths }}
+          path: src-tauri/target/release/bundle
 
   finalize-release:
     needs: [sync-version, build-windows]
@@ -246,17 +246,22 @@ jobs:
           echo "=== Downloaded artifacts ==="
           find artifacts -type f | sort
 
+          # Upload NSIS zip (for updater)
           NSIS_ZIP=$(find artifacts -name "*.nsis.zip" -type f | head -1)
           if [ -n "$NSIS_ZIP" ]; then
             echo "Uploading NSIS zip: $NSIS_ZIP"
             gh release upload "$TAG" "$NSIS_ZIP" --repo "${{ github.repository }}" --clobber
+          else
+            echo "Warning: No NSIS zip found"
           fi
 
+          # Upload all signature files
           for sigfile in $(find artifacts -name "*.sig" -type f); do
             echo "Uploading signature: $sigfile"
             gh release upload "$TAG" "$sigfile" --repo "${{ github.repository }}" --clobber
           done
 
+          # Generate latest.json for updater
           NSIS_SIG=$(find artifacts -name "*.nsis.zip.sig" -type f | head -1)
           if [ -n "$NSIS_SIG" ] && [ -n "$NSIS_ZIP" ]; then
             SIGNATURE=$(cat "$NSIS_SIG")
@@ -282,7 +287,8 @@ jobs:
             cat latest.json
             gh release upload "$TAG" latest.json --repo "${{ github.repository }}" --clobber
           else
-            echo "Warning: No NSIS signature file found"
+            echo "Warning: No NSIS signature file found - updater JSON not generated"
+            echo "Make sure TAURI_SIGNING_PRIVATE_KEY secret is configured correctly"
           fi
 
       - name: Generate release notes and publish
