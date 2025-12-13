@@ -233,3 +233,60 @@ jobs:
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --verbose
+
+      - name: Upload updater files
+        if: inputs.test_build != true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.sync-version.outputs.version }}"
+          TAG="${{ github.ref_name }}"
+          BUNDLE_DIR="src-tauri/target/release/bundle"
+
+          echo "=== Bundle directory contents ==="
+          find "$BUNDLE_DIR" -type f | sort
+
+          # Upload the NSIS zip (required for updater)
+          NSIS_ZIP="$BUNDLE_DIR/nsis/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip"
+          if [ -f "$NSIS_ZIP" ]; then
+            echo "Uploading NSIS zip for updater..."
+            gh release upload "$TAG" "$NSIS_ZIP" --clobber
+          else
+            echo "Warning: NSIS zip not found at $NSIS_ZIP"
+          fi
+
+          # Upload all signature files
+          echo "Uploading signature files..."
+          find "$BUNDLE_DIR" -name "*.sig" -type f | while read sigfile; do
+            filename=$(basename "$sigfile")
+            echo "  Uploading $filename..."
+            gh release upload "$TAG" "$sigfile" --clobber || echo "  Warning: Failed to upload $filename"
+          done
+
+          # Generate latest.json for the updater
+          NSIS_SIG="$BUNDLE_DIR/nsis/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip.sig"
+          if [ -f "$NSIS_SIG" ]; then
+            echo "Generating latest.json..."
+            SIGNATURE=$(cat "$NSIS_SIG")
+            cat > latest.json << EOF
+{
+  "version": "${VERSION}",
+  "notes": "See release notes on GitHub",
+  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "${SIGNATURE}",
+      "url": "https://github.com/justinlevinedotme/BassyStadiumTools/releases/download/${TAG}/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip"
+    }
+  }
+}
+EOF
+            echo "Uploading latest.json..."
+            gh release upload "$TAG" latest.json --clobber
+            echo "=== latest.json contents ==="
+            cat latest.json
+          else
+            echo "ERROR: NSIS signature file not found at $NSIS_SIG"
+            exit 1
+          fi

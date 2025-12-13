@@ -157,24 +157,21 @@
 
 ## Phase 6: Configuration & Cleanup
 
-- [ ] **Add R2 URL constant** (ref: Technical Requirements)
+- [x] **Add R2 URL constant** (ref: Technical Requirements)
   Task ID: phase-6-config-01
-  > **Implementation**: Create `src-tauri/src/constants.rs`
-  > **Details**: Add:
-  > ```rust
-  > pub const BEPINEX_R2_URL: &str = "https://your-r2-bucket.r2.cloudflarestorage.com/bepinex_pack.zip";
-  > ```
-  > Import in download.rs. URL will need to be updated once R2 bucket is created.
+  > **Implementation**: Already in `src-tauri/src/download.rs`
+  > **Details**: Added placeholder URL constant `BEPINEX_R2_URL` directly in download.rs.
+  > Update URL once R2 bucket is configured.
 
 - [ ] **Remove bundled zip from resources (optional)** (ref: Success Criteria)
   Task ID: phase-6-config-02
   > **Implementation**: Edit `src-tauri/tauri.conf.json` and delete `src-tauri/resources/bepinex_pack.zip`
   > **Details**: Remove `"resources": ["resources/*"]` from bundle config once R2 download is confirmed working. Keep file in repo for now as fallback. Can be done in a follow-up PR after testing.
 
-- [ ] **Update .gitignore to exclude large zips** (ref: Success Criteria)
+- [x] **Update .gitignore to exclude large zips** (ref: Success Criteria)
   Task ID: phase-6-config-03
   > **Implementation**: Edit `.gitignore`
-  > **Details**: Uncomment or add: `src-tauri/resources/bepinex_pack.zip` to prevent re-adding large file.
+  > **Details**: Uncommented `src-tauri/resources/bepinex_pack.zip` to prevent re-adding large file.
 
 ---
 
