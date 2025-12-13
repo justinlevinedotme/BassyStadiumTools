@@ -72,7 +72,7 @@ export function useUpdater() {
 
     try {
       await state.update.downloadAndInstall((event) => {
-        console.log("[Updater] Event:", event.event, event.data);
+        console.log("[Updater] Event:", event.event);
         if (event.event === "Started") {
           contentLengthRef.current = event.data.contentLength || 0;
           downloadedRef.current = 0;
