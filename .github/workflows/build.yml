@@ -255,12 +255,22 @@ jobs:
 
           echo "Generating latest.json for version $VERSION"
 
-          # Find the NSIS zip and signature files
-          NSIS_ZIP=$(find artifacts -name "*.nsis.zip" | head -1)
-          NSIS_SIG=$(find artifacts -name "*.nsis.zip.sig" | head -1)
+          # Find the NSIS exe and signature files
+          NSIS_EXE=$(find artifacts -name "*-setup.exe" | head -1)
+          NSIS_SIG=$(find artifacts -name "*-setup.exe.sig" | head -1)
 
-          if [ -z "$NSIS_ZIP" ] || [ -z "$NSIS_SIG" ]; then
-            echo "::error::Could not find NSIS bundle or signature"
+          echo "Found files:"
+          echo "  NSIS_EXE: $NSIS_EXE"
+          echo "  NSIS_SIG: $NSIS_SIG"
+
+          if [ -z "$NSIS_EXE" ]; then
+            echo "::error::Could not find NSIS installer (.exe)"
+            ls -la artifacts/
+            exit 1
+          fi
+
+          if [ -z "$NSIS_SIG" ]; then
+            echo "::error::Could not find signature file (.exe.sig) - is TAURI_SIGNING_PRIVATE_KEY set?"
             ls -la artifacts/
             exit 1
           fi
@@ -282,7 +292,7 @@ jobs:
             "platforms": {
               "windows-x86_64": {
                 "signature": "$SIGNATURE",
-                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/$(basename $NSIS_ZIP)"
+                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/$(basename $NSIS_EXE)"
               }
             }
           }
