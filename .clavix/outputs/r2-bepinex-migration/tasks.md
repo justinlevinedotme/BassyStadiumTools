@@ -78,7 +78,7 @@
 
 ## Phase 3: Frontend - Download Hook
 
-- [ ] **Create useBepInExDownload hook** (ref: Download Progress, Custom URL)
+- [x] **Create useBepInExDownload hook** (ref: Download Progress, Custom URL)
   Task ID: phase-3-frontend-01
   > **Implementation**: Create `src/hooks/useBepInExDownload.ts`
   > **Details**: Model after existing `useUpdater.ts` pattern:
