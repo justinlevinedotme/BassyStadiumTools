@@ -101,7 +101,7 @@
 
 ## Phase 4: Frontend - Installation Dialog Component
 
-- [ ] **Create BepInExInstallDialog component** (ref: Overwrite Warning, Install Options)
+- [x] **Create BepInExInstallDialog component** (ref: Overwrite Warning, Install Options)
   Task ID: phase-4-frontend-01
   > **Implementation**: Create `src/components/BepInExInstallDialog.tsx`
   > **Details**: Use shadcn AlertDialog (already have `@radix-ui/react-alert-dialog`):
@@ -115,7 +115,7 @@
   > - Cancel button during download
   > - Success/error states with toast notifications
 
-- [ ] **Add types for download state** (ref: Technical Requirements)
+- [x] **Add types for download state** (ref: Technical Requirements)
   Task ID: phase-4-frontend-02
   > **Implementation**: Edit `src/types.ts`
   > **Details**: Add interfaces:
