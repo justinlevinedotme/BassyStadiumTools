@@ -230,7 +230,6 @@ jobs:
             > *The `.sig` and `latest.json` files are used by the auto-updater.*
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --verbose
 
@@ -258,10 +257,12 @@ jobs:
 
           # Upload all signature files
           echo "Uploading signature files..."
-          find "$BUNDLE_DIR" -name "*.sig" -type f | while read sigfile; do
-            filename=$(basename "$sigfile")
-            echo "  Uploading $filename..."
-            gh release upload "$TAG" "$sigfile" --clobber || echo "  Warning: Failed to upload $filename"
+          for sigfile in "$BUNDLE_DIR"/nsis/*.sig "$BUNDLE_DIR"/msi/*.sig; do
+            if [ -f "$sigfile" ]; then
+              filename=$(basename "$sigfile")
+              echo "  Uploading $filename..."
+              gh release upload "$TAG" "$sigfile" --clobber || echo "  Warning: Failed to upload $filename"
+            fi
           done
 
           # Generate latest.json for the updater
@@ -269,19 +270,21 @@ jobs:
           if [ -f "$NSIS_SIG" ]; then
             echo "Generating latest.json..."
             SIGNATURE=$(cat "$NSIS_SIG")
-            cat > latest.json << EOF
-{
-  "version": "${VERSION}",
-  "notes": "See release notes on GitHub",
-  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "platforms": {
-    "windows-x86_64": {
-      "signature": "${SIGNATURE}",
-      "url": "https://github.com/justinlevinedotme/BassyStadiumTools/releases/download/${TAG}/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip"
-    }
-  }
-}
-EOF
+            PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            DOWNLOAD_URL="https://github.com/justinlevinedotme/BassyStadiumTools/releases/download/${TAG}/BassyStadiumTools_${VERSION}_x64-setup.nsis.zip"
+
+            printf '%s\n' "{" \
+              "  \"version\": \"${VERSION}\"," \
+              "  \"notes\": \"See release notes on GitHub\"," \
+              "  \"pub_date\": \"${PUB_DATE}\"," \
+              "  \"platforms\": {" \
+              "    \"windows-x86_64\": {" \
+              "      \"signature\": \"${SIGNATURE}\"," \
+              "      \"url\": \"${DOWNLOAD_URL}\"" \
+              "    }" \
+              "  }" \
+              "}" > latest.json
+
             echo "Uploading latest.json..."
             gh release upload "$TAG" latest.json --clobber
             echo "=== latest.json contents ==="
@@ -290,3 +293,4 @@ EOF
             echo "ERROR: NSIS signature file not found at $NSIS_SIG"
             exit 1
           fi
+
