@@ -1,13 +1,32 @@
-import { useState, useCallback, useRef } from "react";
-import { check, Update } from "@tauri-apps/plugin-updater";
+import { useState, useCallback } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+
+const LATEST_JSON_URL = "https://github.com/justinlevinedotme/BassyStadiumTools/releases/latest/download/latest.json";
+
+interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+}
 
 interface UpdateState {
   checking: boolean;
   available: boolean;
-  update: Update | null;
-  downloading: boolean;
-  progress: number;
+  update: UpdateInfo | null;
   error: string | null;
+}
+
+// Simple semver comparison: returns true if remote > current
+function isNewerVersion(remote: string, current: string): boolean {
+  const remoteParts = remote.split(".").map(Number);
+  const currentParts = current.split(".").map(Number);
+
+  for (let i = 0; i < 3; i++) {
+    const r = remoteParts[i] || 0;
+    const c = currentParts[i] || 0;
+    if (r > c) return true;
+    if (r < c) return false;
+  }
+  return false;
 }
 
 export function useUpdater() {
@@ -15,19 +34,24 @@ export function useUpdater() {
     checking: false,
     available: false,
     update: null,
-    downloading: false,
-    progress: 0,
     error: null,
   });
 
-  const contentLengthRef = useRef(0);
-  const downloadedRef = useRef(0);
-
-  const checkForUpdate = useCallback(async () => {
+  const checkForUpdate = useCallback(async (): Promise<UpdateInfo | null> => {
     setState((prev) => ({ ...prev, checking: true, error: null }));
     try {
-      const update = await check();
-      if (update) {
+      const currentVersion = await getVersion();
+
+      const response = await fetch(LATEST_JSON_URL);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch latest.json: ${response.status}`);
+      }
+
+      const data = await response.json() as { version: string };
+      const remoteVersion = data.version;
+
+      if (isNewerVersion(remoteVersion, currentVersion)) {
+        const update = { version: remoteVersion, currentVersion };
         setState((prev) => ({
           ...prev,
           checking: false,
@@ -54,54 +78,8 @@ export function useUpdater() {
     }
   }, []);
 
-  const downloadAndInstall = useCallback(async () => {
-    if (!state.update) {
-      console.error("[Updater] No update available to install");
-      return;
-    }
-
-    console.log("[Updater] Starting downloadAndInstall...");
-    console.log("[Updater] Update info:", {
-      version: state.update.version,
-      currentVersion: state.update.currentVersion,
-    });
-
-    setState((prev) => ({ ...prev, downloading: true, progress: 0 }));
-    contentLengthRef.current = 0;
-    downloadedRef.current = 0;
-
-    try {
-      await state.update.downloadAndInstall((event) => {
-        console.log("[Updater] Event:", event.event);
-        if (event.event === "Started") {
-          contentLengthRef.current = event.data.contentLength || 0;
-          downloadedRef.current = 0;
-          console.log("[Updater] Download started, size:", contentLengthRef.current);
-        } else if (event.event === "Progress") {
-          downloadedRef.current += event.data.chunkLength;
-          if (contentLengthRef.current > 0) {
-            const progress = (downloadedRef.current / contentLengthRef.current) * 100;
-            setState((prev) => ({ ...prev, progress: Math.min(progress, 100) }));
-          }
-        } else if (event.event === "Finished") {
-          console.log("[Updater] Download finished, installing...");
-          setState((prev) => ({ ...prev, progress: 100 }));
-        }
-      });
-      console.log("[Updater] downloadAndInstall completed - app should exit for install");
-    } catch (err) {
-      console.error("[Updater] downloadAndInstall error:", err);
-      setState((prev) => ({
-        ...prev,
-        downloading: false,
-        error: err instanceof Error ? err.message : "Failed to download update",
-      }));
-    }
-  }, [state.update]);
-
   return {
     ...state,
     checkForUpdate,
-    downloadAndInstall,
   };
 }
