@@ -57,7 +57,7 @@
 
 ## Phase 2: Rust Backend - Installation Logic Updates
 
-- [ ] **Refactor install_bepinex_pack to accept zip path** (ref: Install from Local, Download from R2)
+- [x] **Refactor install_bepinex_pack to accept zip path** (ref: Install from Local, Download from R2)
   Task ID: phase-2-backend-01
   > **Implementation**: Edit `src-tauri/src/fm26.rs`
   > **Details**: Modify `install_bepinex_pack` signature to:
@@ -66,7 +66,7 @@
   > - If `zip_path` is None, fall back to bundled resource (existing behavior)
   > - Keep existing backup and extraction logic
 
-- [ ] **Add check_bepinex_installed command** (ref: Overwrite Warning)
+- [x] **Add check_bepinex_installed command** (ref: Overwrite Warning)
   Task ID: phase-2-backend-02
   > **Implementation**: Edit `src-tauri/src/fm26.rs`
   > **Details**: Add new command:

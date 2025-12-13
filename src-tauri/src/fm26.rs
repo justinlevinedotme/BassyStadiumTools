@@ -1,4 +1,4 @@
-use crate::models::{Fm26Installation, PluginStatus};
+use crate::models::{BepInExStatus, Fm26Installation, PluginStatus};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -182,9 +182,11 @@ pub fn inspect_fm26_install(root_path: String) -> Result<Fm26Installation, Strin
     })
 }
 
-/// Installs the BepInEx pack by extracting the bundled zip file
+/// Installs the BepInEx pack by extracting a zip file
+/// If zip_path is provided, uses that file; otherwise falls back to bundled resource
 #[tauri::command]
 pub fn install_bepinex_pack(
+    zip_path: Option<String>,
     app_handle: tauri::AppHandle,
     install: Fm26Installation,
 ) -> Result<(), String> {
@@ -215,18 +217,29 @@ pub fn install_bepinex_pack(
             .map_err(|e| format!("Failed to backup existing BepInEx folder: {}", e))?;
     }
 
-    // Get the resource path for the bundled zip
-    let resource_path = app_handle
-        .path()
-        .resolve("resources/bepinex_pack.zip", tauri::path::BaseDirectory::Resource)
-        .map_err(|e| format!("Failed to resolve resource path: {}", e))?;
+    // Determine the zip file path
+    let zip_file_path: PathBuf = if let Some(path) = zip_path {
+        // Use provided path (from download or local file selection)
+        let p = PathBuf::from(&path);
+        if !p.exists() {
+            return Err(format!("Zip file not found: {}", path));
+        }
+        p
+    } else {
+        // Fall back to bundled resource
+        let resource_path = app_handle
+            .path()
+            .resolve("resources/bepinex_pack.zip", tauri::path::BaseDirectory::Resource)
+            .map_err(|e| format!("Failed to resolve resource path: {}", e))?;
 
-    if !resource_path.exists() {
-        return Err("BepInEx pack not found in resources. Please reinstall the application.".to_string());
-    }
+        if !resource_path.exists() {
+            return Err("BepInEx pack not found. Please download from server or select a local file.".to_string());
+        }
+        resource_path
+    };
 
     // Extract the zip file
-    let file = fs::File::open(&resource_path)
+    let file = fs::File::open(&zip_file_path)
         .map_err(|e| format!("Failed to open BepInEx pack: {}", e))?;
 
     let mut archive = ZipArchive::new(file)
@@ -398,4 +411,41 @@ pub fn get_plugin_status(install: Fm26Installation) -> Vec<PluginStatus> {
             }
         })
         .collect()
+}
+
+/// Checks if BepInEx is installed and returns status for overwrite warning
+#[tauri::command]
+pub fn check_bepinex_installed(install: Fm26Installation) -> BepInExStatus {
+    let bepinex_path = Path::new(&install.bep_in_ex_path);
+    let plugins_path = Path::new(&install.plugins_path);
+
+    let installed = bepinex_path.exists();
+
+    // Count installed plugins if BepInEx exists
+    let mut plugin_count: u32 = 0;
+    let mut has_plugins = false;
+
+    if installed && plugins_path.exists() {
+        // Check for known plugins
+        let known_plugins = vec![
+            "StadiumInjection/StadiumInjection.dll",
+            "AudioInject/AudioInject.dll",
+            "CrowdInject/CrowdInject.dll",
+        ];
+
+        for rel_path in known_plugins {
+            if plugins_path.join(rel_path).exists() {
+                plugin_count += 1;
+            }
+        }
+
+        has_plugins = plugin_count > 0;
+    }
+
+    BepInExStatus {
+        installed,
+        path: install.bep_in_ex_path,
+        has_plugins,
+        plugin_count,
+    }
 }

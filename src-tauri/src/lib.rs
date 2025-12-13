@@ -6,7 +6,7 @@ pub mod configs;
 pub mod logs;
 pub mod download;
 
-use fm26::{detect_fm26_paths, inspect_fm26_install, install_bepinex_pack, install_custom_stadiums_pack, get_plugin_status};
+use fm26::{detect_fm26_paths, inspect_fm26_install, install_bepinex_pack, install_custom_stadiums_pack, get_plugin_status, check_bepinex_installed};
 use stadium::{list_bundles, read_team_mappings, write_team_mappings};
 use audio::{read_audio_mappings, write_audio_mappings, list_audio_folders, inspect_audio_folder};
 use configs::{
@@ -33,6 +33,7 @@ pub fn run() {
             install_bepinex_pack,
             install_custom_stadiums_pack,
             get_plugin_status,
+            check_bepinex_installed,
             list_bundles,
             read_team_mappings,
             write_team_mappings,
