@@ -38,7 +38,8 @@
       "digestAlgorithm": "sha256",
       "timestampUrl": "",
       "nsis": {
-        "compression": "lzma"
+        "compression": "lzma",
+        "installMode": "currentUser"
       }
     }
   },

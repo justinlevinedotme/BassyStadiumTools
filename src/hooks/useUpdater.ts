@@ -55,7 +55,16 @@ export function useUpdater() {
   }, []);
 
   const downloadAndInstall = useCallback(async () => {
-    if (!state.update) return;
+    if (!state.update) {
+      console.error("[Updater] No update available to install");
+      return;
+    }
+
+    console.log("[Updater] Starting downloadAndInstall...");
+    console.log("[Updater] Update info:", {
+      version: state.update.version,
+      currentVersion: state.update.currentVersion,
+    });
 
     setState((prev) => ({ ...prev, downloading: true, progress: 0 }));
     contentLengthRef.current = 0;
@@ -63,9 +72,11 @@ export function useUpdater() {
 
     try {
       await state.update.downloadAndInstall((event) => {
+        console.log("[Updater] Event:", event.event, event.data);
         if (event.event === "Started") {
           contentLengthRef.current = event.data.contentLength || 0;
           downloadedRef.current = 0;
+          console.log("[Updater] Download started, size:", contentLengthRef.current);
         } else if (event.event === "Progress") {
           downloadedRef.current += event.data.chunkLength;
           if (contentLengthRef.current > 0) {
@@ -73,10 +84,13 @@ export function useUpdater() {
             setState((prev) => ({ ...prev, progress: Math.min(progress, 100) }));
           }
         } else if (event.event === "Finished") {
+          console.log("[Updater] Download finished, installing...");
           setState((prev) => ({ ...prev, progress: 100 }));
         }
       });
+      console.log("[Updater] downloadAndInstall completed - app should exit for install");
     } catch (err) {
+      console.error("[Updater] downloadAndInstall error:", err);
       setState((prev) => ({
         ...prev,
         downloading: false,
