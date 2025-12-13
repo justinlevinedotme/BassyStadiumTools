@@ -138,7 +138,7 @@
 
 ## Phase 5: Frontend - GameTab Integration
 
-- [ ] **Update GameTab to use new install dialog** (ref: All Features)
+- [x] **Update GameTab to use new install dialog** (ref: All Features)
   Task ID: phase-5-frontend-01
   > **Implementation**: Edit `src/tabs/GameTab.tsx`
   > **Details**:
@@ -148,7 +148,7 @@
   > - Remove direct `handleInstall` logic (moved to dialog)
   > - Keep existing installation validation and plugin status display
 
-- [ ] **Add progress UI components** (ref: Download Progress)
+- [x] **Add progress UI components** (ref: Download Progress)
   Task ID: phase-5-frontend-02
   > **Implementation**: Run `pnpm dlx shadcn@latest add progress`
   > **Details**: Add shadcn Progress component for download progress bar. Will be used in BepInExInstallDialog.
