@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { fetch } from "@tauri-apps/plugin-http";
 
 const LATEST_JSON_URL = "https://github.com/justinlevinedotme/BassyStadiumTools/releases/latest/download/latest.json";
 
