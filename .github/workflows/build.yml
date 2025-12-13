@@ -206,136 +206,30 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --verbose
 
-      - name: Build & publish (release mode)
+      - name: Build & publish release
         if: inputs.test_build != true
         id: tauri_release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "BassyStadiumTools ${{ github.ref_name }}"
-          releaseBody: "Building artifacts..."
-          releaseDraft: true
+          releaseBody: |
+            ## Installation
+
+            Download the Windows installer:
+            - **Windows:** `BassyStadiumTools_${{ needs.sync-version.outputs.version }}_x64-setup.exe`
+
+            > *The `.sig` and `latest.json` files are used by the auto-updater.*
+          releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           args: --verbose
-
-  finalize-release:
-    needs: [sync-version, build-windows]
-    if: inputs.dry_run != true && inputs.test_build != true
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          mkdir -p artifacts
-
-          # Download all assets from the draft release
-          gh release download "$TAG" --repo "${{ github.repository }}" --dir artifacts || true
-
-          echo "Downloaded assets:"
-          ls -la artifacts/
-
-      - name: Generate latest.json for Tauri updater
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-
-          echo "Generating latest.json for version $VERSION"
-
-          # Find the NSIS exe and signature files
-          NSIS_EXE=$(find artifacts -name "*-setup.exe" | head -1)
-          NSIS_SIG=$(find artifacts -name "*-setup.exe.sig" | head -1)
-
-          echo "Found files:"
-          echo "  NSIS_EXE: $NSIS_EXE"
-          echo "  NSIS_SIG: $NSIS_SIG"
-
-          if [ -z "$NSIS_EXE" ]; then
-            echo "::error::Could not find NSIS installer (.exe)"
-            ls -la artifacts/
-            exit 1
-          fi
-
-          if [ -z "$NSIS_SIG" ]; then
-            echo "::error::Could not find signature file (.exe.sig) - is TAURI_SIGNING_PRIVATE_KEY set?"
-            ls -la artifacts/
-            exit 1
-          fi
-
-          # Read signature content
-          SIGNATURE=$(cat "$NSIS_SIG")
-
-          # Get release notes from GitHub
-          NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-            -f tag_name="$TAG" \
-            --jq '.body' | jq -Rs '.')
-
-          # Generate latest.json
-          cat > latest.json << EOF
-          {
-            "version": "$VERSION",
-            "notes": $NOTES,
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "$SIGNATURE",
-                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/$(basename $NSIS_EXE)"
-              }
-            }
-          }
-          EOF
-
-          echo "Generated latest.json:"
-          cat latest.json
-
-      - name: Upload latest.json to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          gh release upload "$TAG" latest.json --repo "${{ github.repository }}" --clobber
-
-      - name: Generate release notes and publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-
-          # Get auto-generated release notes from GitHub
-          NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
-            -f tag_name="$TAG" \
-            --jq '.body')
-
-          # Append installation footer
-          FOOTER="
-
-          ---
-
-          ### Installation
-
-          Download the Windows installer:
-          - **Windows:** \`BassyStadiumTools_${VERSION}_x64-setup.exe\`
-
-          > *Ignore \`.zip\` / \`.sig\` files - they are used by the auto-updater.*"
-
-          FULL_BODY="${NOTES}${FOOTER}"
-
-          # Update the release with notes and publish (undraft)
-          gh release edit "$TAG" \
-            --repo "${{ github.repository }}" \
-            --notes "$FULL_BODY" \
-            --draft=false
