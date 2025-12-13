@@ -87,3 +87,17 @@ export interface CrowdInjectConfig {
 export interface AdboardsConfig {
   disable_adboards: boolean;
 }
+
+export interface BepInExStatus {
+  installed: boolean;
+  path: string;
+  has_plugins: boolean;
+  plugin_count: number;
+}
+
+export interface DownloadProgress {
+  downloaded: number;
+  total: number;
+  speed_bps: number;
+  percent: number;
+}

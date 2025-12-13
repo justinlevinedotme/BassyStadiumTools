@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FolderOpen, Download, RefreshCw, AlertCircle, CheckCircle2, FileArchive, Search } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { BepInExInstallDialog } from "@/components/BepInExInstallDialog";
 import type { Fm26Installation, PluginStatus } from "@/types";
 
 const STORAGE_KEY = "fm26_install_path";
@@ -23,7 +24,7 @@ export function GameTab() {
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [isInstallingStadiums, setIsInstallingStadiums] = useState(false);
 
   // Load saved path on mount, or try auto-detect
@@ -105,25 +106,13 @@ export function GameTab() {
     }
   };
 
-  const handleInstall = async () => {
-    if (!installation) return;
-
-    setIsInstalling(true);
-    setError(null);
-
-    try {
-      await invoke("install_bepinex_pack", { install: installation });
-      toast.success("BepInEx Stadium Pack installed!");
-
-      // Refresh plugin status
+  const handleInstallComplete = async () => {
+    // Refresh plugin status after installation
+    if (installation) {
       const pluginStatus = await invoke<PluginStatus[]>("get_plugin_status", {
         install: installation,
       });
       setPlugins(pluginStatus);
-    } catch (err) {
-      toast.error("Failed to install BepInEx", { description: String(err) });
-    } finally {
-      setIsInstalling(false);
     }
   };
 
@@ -269,16 +258,12 @@ export function GameTab() {
         </CardHeader>
         <CardContent>
           <Button
-            onClick={handleInstall}
-            disabled={!installation || isInstalling}
+            onClick={() => setShowInstallDialog(true)}
+            disabled={!installation}
             className="w-full"
           >
             <Download className="mr-2 h-4 w-4" />
-            {isInstalling
-              ? "Installing..."
-              : bepInExInstalled
-                ? "Repair Stadium Pack"
-                : "Install Stadium Pack"}
+            {bepInExInstalled ? "Repair Stadium Pack" : "Install Stadium Pack"}
           </Button>
           {!installation && (
             <p className="mt-2 text-sm text-muted-foreground">
@@ -287,6 +272,16 @@ export function GameTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Install Dialog */}
+      {installation && (
+        <BepInExInstallDialog
+          open={showInstallDialog}
+          onOpenChange={setShowInstallDialog}
+          installation={installation}
+          onInstallComplete={handleInstallComplete}
+        />
+      )}
 
       {/* Custom Stadiums Install */}
       {installation && bepInExInstalled && (

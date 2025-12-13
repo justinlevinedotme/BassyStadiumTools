@@ -4,8 +4,9 @@ pub mod stadium;
 pub mod audio;
 pub mod configs;
 pub mod logs;
+pub mod download;
 
-use fm26::{detect_fm26_paths, inspect_fm26_install, install_bepinex_pack, install_custom_stadiums_pack, get_plugin_status};
+use fm26::{detect_fm26_paths, inspect_fm26_install, install_bepinex_pack, install_custom_stadiums_pack, get_plugin_status, check_bepinex_installed};
 use stadium::{list_bundles, read_team_mappings, write_team_mappings};
 use audio::{read_audio_mappings, write_audio_mappings, list_audio_folders, inspect_audio_folder};
 use configs::{
@@ -16,6 +17,7 @@ use configs::{
     list_config_files
 };
 use logs::{read_log, get_log_info, clear_log};
+use download::{download_bepinex_from_r2, download_bepinex_from_url, cancel_download};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,6 +33,7 @@ pub fn run() {
             install_bepinex_pack,
             install_custom_stadiums_pack,
             get_plugin_status,
+            check_bepinex_installed,
             list_bundles,
             read_team_mappings,
             write_team_mappings,
@@ -50,6 +53,9 @@ pub fn run() {
             read_log,
             get_log_info,
             clear_log,
+            download_bepinex_from_r2,
+            download_bepinex_from_url,
+            cancel_download,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

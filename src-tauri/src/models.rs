@@ -150,3 +150,12 @@ impl Default for AdboardsConfig {
         }
     }
 }
+
+/// Status of BepInEx installation for overwrite warning
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BepInExStatus {
+    pub installed: bool,
+    pub path: String,
+    pub has_plugins: bool,
+    pub plugin_count: u32,
+}
