@@ -11,8 +11,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
 /// Default R2 URL for the BepInEx pack
-/// Update this once your R2 bucket is configured
-pub const BEPINEX_R2_URL: &str = "https://pub-PLACEHOLDER.r2.dev/bepinex_pack.zip";
+pub const BEPINEX_R2_URL: &str = "https://pub-f28a650de51d4c779c2eb0799ab5ae14.r2.dev/bepinex_pack.zip";
 
 /// Progress information emitted during download
 #[derive(Clone, Serialize)]
