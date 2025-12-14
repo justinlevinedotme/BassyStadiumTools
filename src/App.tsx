@@ -14,6 +14,7 @@ import { AudioTab } from "@/tabs/AudioTab";
 import { ConfigsTab } from "@/tabs/ConfigsTab";
 import { LogsTab } from "@/tabs/LogsTab";
 import { UpdateChecker } from "@/components/UpdateChecker";
+import { WindowControls } from "@/components/WindowControls";
 
 function App() {
   const [version, setVersion] = useState<string>("");
@@ -108,6 +109,7 @@ function App() {
         </footer>
         <Toaster position="bottom-right" />
         <UpdateChecker />
+        <WindowControls />
       </div>
     </TooltipProvider>
   );
