@@ -25,7 +25,13 @@ function App() {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex-1 p-6">
+        {/* Drag region for window movement */}
+        <div
+          data-tauri-drag-region
+          className="h-8 w-full shrink-0"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        />
+        <div className="flex-1 p-6 pt-0">
           <div className="mx-auto max-w-6xl">
             <h1 className="text-3xl font-bold text-foreground">
               BassyStadiumTools
