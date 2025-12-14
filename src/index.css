@@ -156,3 +156,45 @@
 [data-sonner-toast] [data-description] {
   opacity: 0.85;
 }
+
+/* Decorum Window Controls Styling */
+div[data-tauri-decorum-tb] {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 50000;
+  display: flex;
+  height: 32px;
+  -webkit-app-region: no-drag;
+}
+
+button.decorum-tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+button.decorum-tb-btn:hover {
+  background: hsl(var(--muted));
+}
+
+button.decorum-tb-btn:active {
+  background: hsl(var(--muted) / 0.8);
+}
+
+button#decorum-tb-close:hover {
+  background: #e81123;
+  color: white;
+}
+
+button#decorum-tb-close:active {
+  background: #bf0f1d;
+  color: white;
+}

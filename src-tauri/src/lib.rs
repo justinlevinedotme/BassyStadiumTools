@@ -19,9 +19,22 @@ use configs::{
 use logs::{read_log, get_log_info, clear_log};
 use download::{download_bepinex_from_r2, download_bepinex_from_url, cancel_download};
 
+use tauri::Manager;
+#[cfg(target_os = "windows")]
+use tauri_plugin_decorum::WebviewWindowExt;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_decorum::init())
+        .setup(|_app| {
+            #[cfg(target_os = "windows")]
+            {
+                let main_window = _app.get_webview_window("main").unwrap();
+                main_window.create_overlay_titlebar().unwrap();
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
