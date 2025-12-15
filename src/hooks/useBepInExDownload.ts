@@ -49,6 +49,7 @@ export function useBepInExDownload() {
     const setupListener = async () => {
       unlisten = await listen<DownloadProgress>("download-progress", (event) => {
         const { downloaded, total, speed_bps, percent } = event.payload;
+        console.log("[useBepInExDownload] Progress event:", { downloaded, total, percent: percent.toFixed(1) });
         setState((prev) => ({
           ...prev,
           progress: Math.round(percent),
@@ -69,6 +70,7 @@ export function useBepInExDownload() {
   }, []);
 
   const downloadFromR2 = useCallback(async (): Promise<string> => {
+    console.log("[useBepInExDownload] Starting download from R2...");
     setState((prev) => ({
       ...prev,
       downloading: true,
@@ -81,7 +83,9 @@ export function useBepInExDownload() {
     }));
 
     try {
+      console.log("[useBepInExDownload] Invoking download_bepinex_from_r2...");
       const zipPath = await invoke<string>("download_bepinex_from_r2");
+      console.log("[useBepInExDownload] Download complete:", zipPath);
       setState((prev) => ({
         ...prev,
         downloading: false,

@@ -4,7 +4,6 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -157,9 +156,26 @@ export function BepInExInstallDialog({
     return false;
   };
 
+  // Debug logging
+  console.log("[BepInExInstallDialog] State:", { downloading, installing, progress, total, showConfirm });
+
+  // Prevent closing dialog during download/install
+  const handleOpenChange = (newOpen: boolean) => {
+    // Block closing if download/install is in progress
+    if (!newOpen && (downloading || installing)) {
+      return;
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+      <AlertDialogContent className="max-w-md" onEscapeKeyDown={(e: KeyboardEvent) => {
+        // Prevent escape key closing during download/install
+        if (downloading || installing) {
+          e.preventDefault();
+        }
+      }}>
         <AlertDialogHeader>
           <AlertDialogTitle>Install Stadium Pack</AlertDialogTitle>
           <AlertDialogDescription>
@@ -178,8 +194,8 @@ export function BepInExInstallDialog({
           </Alert>
         )}
 
-        {/* Confirmation Dialog */}
-        {showConfirm && (
+        {/* Confirmation Dialog - hide when downloading */}
+        {showConfirm && !downloading && !installing && (
           <Alert variant="destructive" className="my-2">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
@@ -189,23 +205,28 @@ export function BepInExInstallDialog({
           </Alert>
         )}
 
-        {/* Download Progress */}
-        {downloading && (
+        {/* Download Progress - show when downloading OR installing */}
+        {(downloading || installing) && (
           <div className="space-y-2 my-4">
             <div className="flex justify-between text-sm">
-              <span>Downloading...</span>
+              <span>{progress === 100 ? "Extracting..." : total ? "Downloading..." : "Connecting..."}</span>
               <span>{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{downloaded} / {total}</span>
-              <span>{speed}</span>
-            </div>
+            {total && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{downloaded} / {total}</span>
+                <span>{speed}</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Please wait while the pack downloads. Do not close this window.
+            </p>
           </div>
         )}
 
         {/* Source Selection */}
-        {!downloading && !showConfirm && (
+        {!downloading && !installing && !showConfirm && (
           <div className="space-y-4 my-4">
             {/* R2 Download */}
             <div
@@ -220,7 +241,7 @@ export function BepInExInstallDialog({
               <div className="flex-1">
                 <div className="font-medium">Download from server</div>
                 <div className="text-sm text-muted-foreground">
-                  Recommended. Downloads the latest pack (~50 MB).
+                  Recommended. Downloads the latest pack (~5 GB).
                 </div>
               </div>
             </div>
@@ -314,8 +335,11 @@ export function BepInExInstallDialog({
               "Cancel"
             )}
           </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleInstall}
+          <Button
+            onClick={(e) => {
+              e.preventDefault();
+              handleInstall();
+            }}
             disabled={isButtonDisabled()}
           >
             {installing || downloading ? (
@@ -325,7 +349,7 @@ export function BepInExInstallDialog({
             ) : (
               "Install"
             )}
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

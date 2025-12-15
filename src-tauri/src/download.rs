@@ -11,7 +11,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
 /// Default R2 URL for the BepInEx pack
-pub const BEPINEX_R2_URL: &str = "https://pub-f28a650de51d4c779c2eb0799ab5ae14.r2.dev/bepinex_pack.zip";
+pub const BEPINEX_R2_URL: &str = "https://r2.justinlevine.me/bepinex_pack.zip";
 
 /// Progress information emitted during download
 #[derive(Clone, Serialize)]
@@ -54,6 +54,14 @@ async fn download_file_with_progress(
     }
 
     let total_size = response.content_length().unwrap_or(0);
+
+    // Emit initial progress to show download has started
+    let _ = app.emit("download-progress", DownloadProgress {
+        downloaded: 0,
+        total: total_size,
+        speed_bps: 0.0,
+        percent: 0.0,
+    });
 
     // Create parent directories if needed
     if let Some(parent) = dest_path.parent() {

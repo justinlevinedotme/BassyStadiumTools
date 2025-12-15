@@ -245,8 +245,36 @@ pub fn install_bepinex_pack(
     let mut archive = ZipArchive::new(file)
         .map_err(|e| format!("Failed to read BepInEx pack archive: {}", e))?;
 
-    // The zip has a root folder "BepInExStadiums/" that we need to strip
-    let strip_prefix = "BepInExStadiums/";
+    // Detect the root folder prefix to strip (e.g., "BepInExStadiums/" or "bepinex_pack/")
+    // Collect first few file names to analyze the structure
+    let mut first_names: Vec<String> = Vec::new();
+    for i in 0..archive.len().min(10) {
+        if let Ok(file) = archive.by_index(i) {
+            if let Some(path) = file.enclosed_name() {
+                first_names.push(path.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    let strip_prefix: Option<String> = if !first_names.is_empty() {
+        if let Some(slash_pos) = first_names[0].find('/') {
+            let potential_root = &first_names[0][..=slash_pos];
+            // Verify most entries start with this root
+            let matching_count = first_names.iter()
+                .filter(|n| n.starts_with(potential_root))
+                .count();
+
+            if matching_count >= first_names.len() / 2 {
+                Some(potential_root.to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)
@@ -257,12 +285,16 @@ pub fn install_bepinex_pack(
             None => continue,
         };
 
-        // Strip the root folder prefix
-        let relative_path = file_path
-            .to_string_lossy()
-            .strip_prefix(strip_prefix)
-            .map(|s| std::path::PathBuf::from(s))
-            .unwrap_or(file_path);
+        // Strip the root folder prefix if detected
+        let relative_path = if let Some(ref prefix) = strip_prefix {
+            file_path
+                .to_string_lossy()
+                .strip_prefix(prefix)
+                .map(|s| std::path::PathBuf::from(s))
+                .unwrap_or(file_path)
+        } else {
+            file_path
+        };
 
         // Skip if this is just the root folder itself
         if relative_path.as_os_str().is_empty() {
@@ -394,7 +426,8 @@ pub fn install_custom_stadiums_pack(
 pub fn get_plugin_status(install: Fm26Installation) -> Vec<PluginStatus> {
     let plugins = vec![
         ("StadiumInjection", "StadiumInjection/StadiumInjection.dll"),
-        ("AudioInject", "AudioInject/AudioInject.dll"),
+        // TODO: Re-enable AudioInject check when audio injection support is ready
+        // ("AudioInject", "AudioInject/AudioInject.dll"),
         ("CrowdInject", "CrowdInject/CrowdInject.dll"),
     ];
 
@@ -429,7 +462,8 @@ pub fn check_bepinex_installed(install: Fm26Installation) -> BepInExStatus {
         // Check for known plugins
         let known_plugins = vec![
             "StadiumInjection/StadiumInjection.dll",
-            "AudioInject/AudioInject.dll",
+            // TODO: Re-enable AudioInject check when audio injection support is ready
+            // "AudioInject/AudioInject.dll",
             "CrowdInject/CrowdInject.dll",
         ];
 
