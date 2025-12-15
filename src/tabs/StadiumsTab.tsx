@@ -224,9 +224,9 @@ export function StadiumsTab() {
             </Badge>
           </CardTitle>
           <CardDescription>
-            Map team IDs to stadium bundles. Each team can only have one stadium.
+            Map stadium IDs to stadium bundles. Each stadium can only have one bundle.
             <span className="block mt-1">
-              Need team IDs? Find them at{" "}
+              Need stadium IDs? Find them at{" "}
               <a
                 href="https://fmref.com/"
                 target="_blank"
