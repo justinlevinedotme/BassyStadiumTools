@@ -256,18 +256,26 @@ pub fn install_bepinex_pack(
         }
     }
 
+    // Detect wrapper folder to strip (e.g., "bepinex_pack/" or "BepInExStadiums/")
+    // but NOT "BepInEx/" itself since that's the target folder structure
     let strip_prefix: Option<String> = if !first_names.is_empty() {
         if let Some(slash_pos) = first_names[0].find('/') {
             let potential_root = &first_names[0][..=slash_pos];
-            // Verify most entries start with this root
-            let matching_count = first_names.iter()
-                .filter(|n| n.starts_with(potential_root))
-                .count();
 
-            if matching_count >= first_names.len() / 2 {
-                Some(potential_root.to_string())
-            } else {
+            // Don't strip "BepInEx/" - that's the actual folder we want to preserve
+            if potential_root.eq_ignore_ascii_case("BepInEx/") {
                 None
+            } else {
+                // Verify most entries start with this root
+                let matching_count = first_names.iter()
+                    .filter(|n| n.starts_with(potential_root))
+                    .count();
+
+                if matching_count >= first_names.len() / 2 {
+                    Some(potential_root.to_string())
+                } else {
+                    None
+                }
             }
         } else {
             None
