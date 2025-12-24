@@ -38,7 +38,9 @@ export function BepInExInstallDialog({
   const [source, setSource] = useState<InstallSource>("r2");
   const [customUrl, setCustomUrl] = useState("");
   const [localPath, setLocalPath] = useState("");
-  const [bepInExStatus, setBepInExStatus] = useState<BepInExStatus | null>(null);
+  const [bepInExStatus, setBepInExStatus] = useState<BepInExStatus | null>(
+    null
+  );
   const [installing, setInstalling] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -59,7 +61,9 @@ export function BepInExInstallDialog({
   // Check existing BepInEx status when dialog opens
   useEffect(() => {
     if (open && installation) {
-      invoke<BepInExStatus>("check_bepinex_installed", { install: installation })
+      invoke<BepInExStatus>("check_bepinex_installed", {
+        install: installation,
+      })
         .then(setBepInExStatus)
         .catch(console.error);
     }
@@ -157,7 +161,13 @@ export function BepInExInstallDialog({
   };
 
   // Debug logging
-  console.log("[BepInExInstallDialog] State:", { downloading, installing, progress, total, showConfirm });
+  console.log("[BepInExInstallDialog] State:", {
+    downloading,
+    installing,
+    progress,
+    total,
+    showConfirm,
+  });
 
   // Prevent closing dialog during download/install
   const handleOpenChange = (newOpen: boolean) => {
@@ -170,12 +180,15 @@ export function BepInExInstallDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <AlertDialogContent className="max-w-md" onEscapeKeyDown={(e: KeyboardEvent) => {
-        // Prevent escape key closing during download/install
-        if (downloading || installing) {
-          e.preventDefault();
-        }
-      }}>
+      <AlertDialogContent
+        className="max-w-md"
+        onEscapeKeyDown={(e: KeyboardEvent) => {
+          // Prevent escape key closing during download/install
+          if (downloading || installing) {
+            e.preventDefault();
+          }
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Install Stadium Pack</AlertDialogTitle>
           <AlertDialogDescription>
@@ -188,8 +201,8 @@ export function BepInExInstallDialog({
           <Alert variant="destructive" className="my-2">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              BepInEx is already installed with {bepInExStatus.plugin_count} plugin(s).
-              Installing will replace existing files.
+              BepInEx is already installed with {bepInExStatus.plugin_count}{" "}
+              plugin(s). Installing will replace existing files.
             </AlertDescription>
           </Alert>
         )}
@@ -199,8 +212,9 @@ export function BepInExInstallDialog({
           <Alert variant="destructive" className="my-2">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Are you sure?</strong> This will overwrite your existing BepInEx installation
-              at <code className="text-xs">{bepInExStatus?.path}</code>
+              <strong>Are you sure?</strong> This will overwrite your existing
+              BepInEx installation at{" "}
+              <code className="text-xs">{bepInExStatus?.path}</code>
             </AlertDescription>
           </Alert>
         )}
@@ -209,13 +223,21 @@ export function BepInExInstallDialog({
         {(downloading || installing) && (
           <div className="space-y-2 my-4">
             <div className="flex justify-between text-sm">
-              <span>{progress === 100 ? "Extracting..." : total ? "Downloading..." : "Connecting..."}</span>
+              <span>
+                {progress === 100
+                  ? "Extracting..."
+                  : total
+                  ? "Downloading..."
+                  : "Connecting..."}
+              </span>
               <span>{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
             {total && (
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{downloaded} / {total}</span>
+                <span>
+                  {downloaded} / {total}
+                </span>
                 <span>{speed}</span>
               </div>
             )}
@@ -241,7 +263,7 @@ export function BepInExInstallDialog({
               <div className="flex-1">
                 <div className="font-medium">Download from server</div>
                 <div className="text-sm text-muted-foreground">
-                  Recommended. Downloads the latest pack (~5 GB).
+                  Recommended. Downloads the latest pack (~10 GB).
                 </div>
               </div>
             </div>
@@ -325,7 +347,10 @@ export function BepInExInstallDialog({
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleCancel} disabled={installing && !canCancel}>
+          <AlertDialogCancel
+            onClick={handleCancel}
+            disabled={installing && !canCancel}
+          >
             {downloading && canCancel ? (
               <>
                 <X className="mr-2 h-4 w-4" />
@@ -342,13 +367,11 @@ export function BepInExInstallDialog({
             }}
             disabled={isButtonDisabled()}
           >
-            {installing || downloading ? (
-              "Installing..."
-            ) : showConfirm ? (
-              "Confirm & Install"
-            ) : (
-              "Install"
-            )}
+            {installing || downloading
+              ? "Installing..."
+              : showConfirm
+              ? "Confirm & Install"
+              : "Install"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
