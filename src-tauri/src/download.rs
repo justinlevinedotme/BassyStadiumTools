@@ -11,7 +11,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
 /// Default R2 URL for the BepInEx pack
-pub const BEPINEX_R2_URL: &str = "https://www.dropbox.com/scl/fi/ta3vu5q01cjiiow29803f/bepinex_pack.zip?rlkey=ujzmw5suf4ahbd07lqxr8qi47&st=7ulufgrd&dl=1";
+pub const BEPINEX_R2_URL: &str = "https://r2.justinlevine.me/bepinex_pack.zip";
 
 /// Progress information emitted during download
 #[derive(Clone, Serialize)]
